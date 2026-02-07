@@ -672,7 +672,7 @@ function CircuitRing({stations, selectedIdx, onSelect, onRemove}) {
   );
 
   const size = Math.max(320, Math.min(520, (typeof window !== "undefined" ? window.innerWidth : 520) - 40));
-  const cx = size / 2, cy = size / 2;
+  const cx = size / 2, cy = size / 2 + size * 0.06;
   const rad = size * 0.385;
   const nr = size * 0.092;
   const fs = size < 420 ? 10 : 11;
