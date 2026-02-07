@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Belmont Hill Varsity Tennis — Training Hub</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎾</text></svg>" />
-  <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}</style>
+  <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}button{font-family:inherit}input{font-family:inherit}</style>
 </head>
 <body>
   <div id="root"></div>
@@ -15,771 +15,440 @@
   <script type="text/babel">
     const { useState, useEffect, useRef, useCallback } = React;
 
-    // ═══════════════════════════════════════════════════════════════
-    //  BELMONT HILL VARSITY TENNIS — TRAINING HUB
-    //
-    //  HOW TO CUSTOMIZE:
-    //  ► Add/remove drills: edit the DRILLS array below
-    //  ► Add/remove circuits: edit the CIRCUITS array below
-    //  ► Add YouTube clips: set youtubeId to the YouTube video ID
-    //    (the part after ?v= in the URL)
-    // ═══════════════════════════════════════════════════════════════
-
-    // ── Brand Colors ──
     const BH = {
-      navy: "#1B365D", navyLight: "#2C5282", navyDark: "#0F1F38",
-      gold: "#C9A227", goldLight: "#D4B94E", goldDim: "#A8892A",
-      white: "#FFF", offWhite: "#F7F8FA",
-      g100: "#F3F4F6", g200: "#E5E7EB", g300: "#D1D5DB",
-      g400: "#9CA3AF", g500: "#6B7280", g700: "#374151", g800: "#1F2937",
-      courtGreen: "#1B6B2B", courtDark: "#145220",
-      shotBlue: "#3B82F6", shotRed: "#EF4444", shotGold: "#F59E0B",
+      navy:"#1B365D",navyLight:"#2C5282",navyDark:"#0F1F38",
+      gold:"#C9A227",goldLight:"#D4B94E",goldDim:"#A8892A",
+      white:"#FFF",offWhite:"#F7F8FA",
+      g100:"#F3F4F6",g200:"#E5E7EB",g300:"#D1D5DB",
+      g400:"#9CA3AF",g500:"#6B7280",g700:"#374151",g800:"#1F2937",
+      courtGreen:"#1B6B2B",courtDark:"#145220",
+      shotBlue:"#3B82F6",shotRed:"#EF4444",shotGold:"#F59E0B",
     };
 
-    // ── Court SVG Mapping ──
-    const CRT = { W: 400, H: 760, PAD: 30 };
-    const cw = CRT.W - 2 * CRT.PAD;
-    const ch = CRT.H - 2 * CRT.PAD;
-    const mapX = (x) => CRT.PAD + (x / 100) * cw;
-    const mapY = (y) => CRT.PAD + (y / 100) * ch;
-    const SL = { l: CRT.PAD + (4.5 / 36) * cw, r: CRT.W - CRT.PAD - (4.5 / 36) * cw };
-    const NET_Y = mapY(50);
-    const SVC = { far: NET_Y - (21 / 39) * (ch / 2), near: NET_Y + (21 / 39) * (ch / 2) };
+    const CRT={W:400,H:760,PAD:30};
+    const cw=CRT.W-2*CRT.PAD,ch=CRT.H-2*CRT.PAD;
+    const mX=x=>CRT.PAD+(x/100)*cw;
+    const mY=y=>CRT.PAD+(y/100)*ch;
+    const SL={l:CRT.PAD+(4.5/36)*cw,r:CRT.W-CRT.PAD-(4.5/36)*cw};
+    const NET_Y=mY(50);
+    const SVC={far:NET_Y-(21/39)*(ch/2),near:NET_Y+(21/39)*(ch/2)};
 
-    // ── Audio ──
-    const beep = (freq = 800, dur = 150, vol = 0.25) => {
-      try {
-        const c = new (window.AudioContext || window.webkitAudioContext)();
-        const o = c.createOscillator(); const g = c.createGain();
-        o.frequency.value = freq; o.type = "sine";
-        g.gain.setValueAtTime(vol, c.currentTime);
-        g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + dur / 1000);
-        o.connect(g); g.connect(c.destination);
-        o.start(); o.stop(c.currentTime + dur / 1000);
-      } catch(e) {}
+    // Shot poses [armStartX,armStartY,armEndX,armEndY,racketHeadAngle]
+    const POSES={
+      forehand:[9,-2,22,-10,-55],backhand:[-9,-2,-22,-10,55],
+      serve:[5,-6,8,-24,-10],fh_volley:[8,-4,18,-12,-45],bh_volley:[-8,-4,-18,-12,45],
+      overhead:[4,-5,6,-23,-5],slice_fh:[10,-1,20,-6,-65],slice_bh:[-10,-1,-20,-6,65],
     };
-    const snd = {
-      switch: () => { beep(880, 150); setTimeout(() => beep(880, 150), 200); setTimeout(() => beep(1100, 250), 400); },
-      rest: () => beep(440, 400, 0.2),
-      tick: () => beep(660, 80, 0.15),
-      done: () => { beep(523, 120); setTimeout(() => beep(659, 120), 160); setTimeout(() => beep(784, 120), 320); setTimeout(() => beep(1047, 350), 480); },
+    const BODY_ROT={forehand:25,backhand:-25,serve:12,fh_volley:15,bh_volley:-15,overhead:10,slice_fh:20,slice_bh:-20};
+
+    const beep=(freq,dur,vol=0.25)=>{try{const c=new(window.AudioContext||window.webkitAudioContext)(),o=c.createOscillator(),g=c.createGain();o.frequency.value=freq;o.type="sine";g.gain.setValueAtTime(vol,c.currentTime);g.gain.exponentialRampToValueAtTime(0.001,c.currentTime+dur/1000);o.connect(g);g.connect(c.destination);o.start();o.stop(c.currentTime+dur/1000)}catch(e){}};
+    const snd={
+      go:()=>{beep(880,150);setTimeout(()=>beep(880,150),200);setTimeout(()=>beep(1100,250),400)},
+      rest:()=>beep(440,400,0.2),tick:()=>beep(660,80,0.15),
+      done:()=>{beep(523,120);setTimeout(()=>beep(659,120),160);setTimeout(()=>beep(784,120),320);setTimeout(()=>beep(1047,350),480)},
     };
 
-    // ═══════════════════════════════════════════════════════════════
-    //  DRILL DATABASE
-    // ═══════════════════════════════════════════════════════════════
-    const DRILLS = [
-      {
-        id: "cc-fh", name: "Crosscourt Forehand", cat: "singles", diff: "All Levels",
-        desc: "Rally crosscourt forehands from the deuce side. Focus on consistency, depth, and heavy topspin. Keep the ball deep past the service line.",
-        tips: ["Early preparation — racquet back before the ball bounces", "Aim 4–6 feet above the net for depth", "Recover to the center hash after each shot", "Full follow-through over the shoulder"],
-        youtubeId: null, courtType: "singles",
-        players: [{ id: "A", x: 72, y: 92, color: BH.shotBlue }, { id: "B", x: 28, y: 8, color: BH.shotRed }],
-        steps: [
-          { t: "hit", f: [72, 92], to: [28, 12], c: BH.shotBlue, n: "1" },
-          { t: "move", f: [72, 92], to: [50, 90], c: BH.shotBlue },
-          { t: "hit", f: [28, 12], to: [72, 88], c: BH.shotRed, n: "2" },
-          { t: "move", f: [28, 8], to: [50, 10], c: BH.shotRed },
-          { t: "hit", f: [72, 88], to: [28, 12], c: BH.shotBlue, n: "3" },
-        ],
-      },
-      {
-        id: "cc-bh", name: "Crosscourt Backhand", cat: "singles", diff: "All Levels",
-        desc: "Rally crosscourt backhands from the ad side. Emphasize consistent depth and placement with either one-hand or two-hand technique.",
-        tips: ["Full unit turn with the shoulders", "Step into the ball on contact", "Extend through the contact point", "Drive through — don't roll over the ball"],
-        youtubeId: null, courtType: "singles",
-        players: [{ id: "A", x: 28, y: 92, color: BH.shotBlue }, { id: "B", x: 72, y: 8, color: BH.shotRed }],
-        steps: [
-          { t: "hit", f: [28, 92], to: [72, 12], c: BH.shotBlue, n: "1" },
-          { t: "move", f: [28, 92], to: [50, 90], c: BH.shotBlue },
-          { t: "hit", f: [72, 12], to: [28, 88], c: BH.shotRed, n: "2" },
-          { t: "move", f: [72, 8], to: [50, 10], c: BH.shotRed },
-        ],
-      },
-      {
-        id: "dtl-fh", name: "Down the Line Forehand", cat: "singles", diff: "Intermediate",
-        desc: "Hit forehands straight down the line from the deuce side. An aggressive shot that demands precision — commit to it.",
-        tips: ["Contact point slightly in front of the body", "Drive straight through the ball", "Aim for the back third of the court", "This is a weapon shot — hit with conviction"],
-        youtubeId: null, courtType: "singles",
-        players: [{ id: "A", x: 72, y: 92, color: BH.shotBlue }, { id: "B", x: 72, y: 8, color: BH.shotRed }],
-        steps: [
-          { t: "hit", f: [72, 92], to: [72, 12], c: BH.shotBlue, n: "1" },
-          { t: "move", f: [72, 92], to: [55, 88], c: BH.shotBlue },
-          { t: "hit", f: [72, 12], to: [72, 88], c: BH.shotRed, n: "2" },
-        ],
-      },
-      {
-        id: "io-fh", name: "Inside-Out Forehand", cat: "singles", diff: "Advanced",
-        desc: "Run around the backhand to hit an inside-out forehand crosscourt to the opponent's backhand. A key rally-domination pattern.",
-        tips: ["Quick feet — small adjustment steps to set up", "Load on the outside (right) foot", "Drive crosscourt with authority and spin", "Recover quickly to center after the shot"],
-        youtubeId: null, courtType: "singles",
-        players: [{ id: "A", x: 50, y: 90, color: BH.shotBlue }, { id: "B", x: 72, y: 8, color: BH.shotRed }],
-        steps: [
-          { t: "hit", f: [72, 12], to: [35, 85], c: BH.shotRed, n: "1", note: "Ball to backhand side" },
-          { t: "move", f: [50, 90], to: [30, 88], c: BH.shotBlue, note: "Run around backhand" },
-          { t: "hit", f: [30, 88], to: [72, 12], c: BH.shotBlue, n: "2", note: "Inside-out FH!" },
-          { t: "move", f: [30, 88], to: [50, 90], c: BH.shotBlue, note: "Recover center" },
-        ],
-      },
-      {
-        id: "serve1", name: "Serve + First Ball", cat: "singles", diff: "Intermediate",
-        desc: "Serve wide to the deuce court, then attack the open court with the first ball. The bread-and-butter serve-plus-one pattern.",
-        tips: ["Hit your serving spot — wide with purpose", "Split step as the opponent hits the return", "Attack the open court aggressively", "Be ready to close if the ball is short"],
-        youtubeId: null, courtType: "singles",
-        players: [{ id: "S", x: 55, y: 98, color: BH.shotBlue }, { id: "R", x: 50, y: 5, color: BH.shotRed }],
-        steps: [
-          { t: "hit", f: [55, 98], to: [82, 28], c: BH.shotGold, n: "1", note: "Wide serve" },
-          { t: "move", f: [50, 5], to: [85, 12], c: BH.shotRed, note: "Returner pushed wide" },
-          { t: "hit", f: [85, 12], to: [40, 82], c: BH.shotRed, n: "2", note: "Crosscourt return" },
-          { t: "move", f: [55, 98], to: [42, 88], c: BH.shotBlue },
-          { t: "hit", f: [42, 88], to: [75, 10], c: BH.shotBlue, n: "3", note: "Attack open court!" },
-        ],
-      },
-      {
-        id: "app-vol", name: "Approach + Volley", cat: "singles", diff: "Intermediate",
-        desc: "Attack a short ball with an approach shot down the line, close to net, and finish with a crosscourt volley.",
-        tips: ["Approach down the line to cut passing angles", "Placement over power on the approach", "Split step as you close to net", "Volley crosscourt to the open court"],
-        youtubeId: null, courtType: "singles",
-        players: [{ id: "A", x: 50, y: 85, color: BH.shotBlue }, { id: "B", x: 50, y: 8, color: BH.shotRed }],
-        steps: [
-          { t: "hit", f: [50, 8], to: [65, 62], c: BH.shotRed, n: "1", note: "Short ball!" },
-          { t: "move", f: [50, 85], to: [65, 62], c: BH.shotBlue, note: "Move to short ball" },
-          { t: "hit", f: [65, 62], to: [72, 8], c: BH.shotBlue, n: "2", note: "Approach DTL" },
-          { t: "move", f: [65, 62], to: [62, 54], c: BH.shotBlue, note: "Close to net" },
-          { t: "hit", f: [72, 8], to: [30, 75], c: BH.shotRed, n: "3", note: "Passing attempt" },
-          { t: "hit", f: [62, 54], to: [25, 8], c: BH.shotBlue, n: "4", note: "Volley winner!" },
-        ],
-      },
-      {
-        id: "dbl-poach", name: "Doubles: Poach Pattern", cat: "doubles", diff: "Intermediate",
-        desc: "Baseline player rallies crosscourt while the net player reads the ball and poaches (intercepts at net).",
-        tips: ["Net player: stay active, move on opponent's contact", "Baseline player: keep rallying crosscourt to set up the poach", "Poach decisively — commit once you go", "After the poach, both players cover open court"],
-        youtubeId: null, courtType: "doubles",
-        players: [
-          { id: "A1", x: 72, y: 90, color: BH.shotBlue }, { id: "A2", x: 32, y: 58, color: BH.shotBlue },
-          { id: "B1", x: 28, y: 10, color: BH.shotRed }, { id: "B2", x: 68, y: 42, color: BH.shotRed },
-        ],
-        steps: [
-          { t: "hit", f: [72, 90], to: [28, 14], c: BH.shotBlue, n: "1", note: "Rally crosscourt" },
-          { t: "hit", f: [28, 14], to: [68, 86], c: BH.shotRed, n: "2" },
-          { t: "hit", f: [68, 86], to: [28, 14], c: BH.shotBlue, n: "3" },
-          { t: "move", f: [32, 58], to: [55, 50], c: BH.shotGold, note: "POACH!" },
-          { t: "hit", f: [28, 14], to: [52, 52], c: BH.shotRed, n: "4" },
-          { t: "hit", f: [55, 50], to: [82, 15], c: BH.shotGold, n: "5", note: "Volley winner!" },
-        ],
-      },
-      {
-        id: "dbl-sv", name: "Doubles: Serve + Volley", cat: "doubles", diff: "Advanced",
-        desc: "Classic doubles: serve and follow to net. Partner holds net position. Both close to finish the point together at the net.",
-        tips: ["Serve with intent — wide or at the body", "First volley: get it deep, then close", "Partner stays alert for poach opportunity", "Both players close together to dominate the net"],
-        youtubeId: null, courtType: "doubles",
-        players: [
-          { id: "S", x: 58, y: 98, color: BH.shotBlue }, { id: "N1", x: 28, y: 56, color: BH.shotBlue },
-          { id: "R", x: 28, y: 5, color: BH.shotRed }, { id: "N2", x: 72, y: 44, color: BH.shotRed },
-        ],
-        steps: [
-          { t: "hit", f: [58, 98], to: [15, 30], c: BH.shotGold, n: "1", note: "Wide serve" },
-          { t: "move", f: [58, 98], to: [58, 68], c: BH.shotBlue, note: "Server approaches" },
-          { t: "hit", f: [15, 12], to: [55, 66], c: BH.shotRed, n: "2", note: "Return at feet" },
-          { t: "hit", f: [58, 66], to: [22, 12], c: BH.shotBlue, n: "3", note: "Deep first volley" },
-          { t: "move", f: [58, 68], to: [58, 56], c: BH.shotBlue, note: "Server closes" },
-          { t: "hit", f: [22, 12], to: [42, 52], c: BH.shotRed, n: "4" },
-          { t: "hit", f: [28, 56], to: [80, 15], c: BH.shotGold, n: "5", note: "Net player puts away!" },
-        ],
-      },
+    // ═══════════ EXERCISE DATABASE ═══════════
+    const EXERCISES=[
+      {id:"russian-twist",name:"Russian Twists",cat:"Core",desc:"Seated twists with med ball. Feet off ground, rotate fully side to side.",reps:"20 reps",equip:"Med Ball 8-12lb"},
+      {id:"plank",name:"Plank Hold",cat:"Core",desc:"Forearm plank, tight core, hips level. Don't let hips sag.",reps:"45 sec",equip:"None"},
+      {id:"bicycle",name:"Bicycle Crunches",cat:"Core",desc:"Alternating elbow-to-knee crunches. Controlled, no yanking the neck.",reps:"20 each",equip:"None"},
+      {id:"dead-bug",name:"Dead Bugs",cat:"Core",desc:"Lying on back, extend opposite arm/leg while keeping low back flat.",reps:"10 each",equip:"None"},
+      {id:"v-ups",name:"V-Ups",cat:"Core",desc:"Simultaneously lift legs and torso to touch toes at the top.",reps:"15 reps",equip:"None"},
+      {id:"side-plank",name:"Side Plank",cat:"Core",desc:"Forearm side plank, hips stacked. Hold each side.",reps:"30s each",equip:"None"},
+      {id:"rot-throw",name:"Rotational Throws",cat:"Rotation",desc:"Stand sideways to wall, rotate explosively to throw med ball.",reps:"10 each",equip:"Med Ball + Wall"},
+      {id:"woodchop",name:"Band Woodchops",cat:"Rotation",desc:"High-to-low diagonal pull with resistance band. Control the decel.",reps:"12 each",equip:"Resistance Band"},
+      {id:"pallof-press",name:"Pallof Press",cat:"Rotation",desc:"Anti-rotation press with band. Resist the pull, arms fully extended.",reps:"10 each",equip:"Resistance Band"},
+      {id:"torso-rot",name:"Standing Rotation",cat:"Rotation",desc:"Band at chest height, rotate torso away. Hips stay square.",reps:"15 each",equip:"Resistance Band"},
+      {id:"ladder",name:"Ladder Drills",cat:"Agility",desc:"Quick feet through agility ladder. In-in-out-out or icky shuffle.",reps:"4 lengths",equip:"Agility Ladder"},
+      {id:"cone-shuffle",name:"Cone Shuffles",cat:"Agility",desc:"Defensive lateral shuffles between cones 10ft apart. Stay low.",reps:"8 trips",equip:"2 Cones"},
+      {id:"split-step",name:"Split Step Jumps",cat:"Agility",desc:"Continuous split steps. Land balanced, ready to move any direction.",reps:"20 reps",equip:"None"},
+      {id:"suicides",name:"Suicide Sprints",cat:"Agility",desc:"Sprint to line 1, back, line 2, back, line 3, back. Full speed.",reps:"4 sets",equip:"4 Cones"},
+      {id:"sprint-back",name:"Sprint + Backpedal",cat:"Agility",desc:"Sprint 20ft forward, backpedal to start. Stay on balls of feet.",reps:"6 trips",equip:"None"},
+      {id:"box-jump",name:"Box Jumps",cat:"Lower Body",desc:"Explosive jump onto box, step down. Land soft, knees over toes.",reps:"12 reps",equip:"20-24\" Box"},
+      {id:"lat-lunge",name:"Lateral Lunges",cat:"Lower Body",desc:"Deep lateral lunges, push off explosively back to center.",reps:"10 each",equip:"None"},
+      {id:"squat-jump",name:"Squat Jumps",cat:"Lower Body",desc:"Full squat then explode up. Land soft, immediately descend.",reps:"15 reps",equip:"None"},
+      {id:"single-hop",name:"Single Leg Hops",cat:"Lower Body",desc:"Forward hops on one leg. Stick the landing, control the knee.",reps:"8 each",equip:"None"},
+      {id:"calf-raise",name:"Calf Raises",cat:"Lower Body",desc:"Slow calf raises on edge of step. 3 second hold at the top.",reps:"20 reps",equip:"Step"},
+      {id:"wall-throw",name:"Wall Throws",cat:"Upper Body",desc:"Med ball chest throws against wall. Explosive push, catch on rebound.",reps:"15 reps",equip:"Med Ball + Wall"},
+      {id:"pushups",name:"Push-Up Variations",cat:"Upper Body",desc:"Mix of standard, wide, diamond. Chest to floor each rep.",reps:"15 reps",equip:"None"},
+      {id:"band-pull",name:"Band Pull-Aparts",cat:"Upper Body",desc:"Resistance band at chest height, pull apart to full extension.",reps:"15 reps",equip:"Resistance Band"},
+      {id:"oh-throw",name:"Overhead Throws",cat:"Upper Body",desc:"Med ball overhead slam throws. Full extension, explosive.",reps:"12 reps",equip:"Med Ball"},
+      {id:"jump-rope",name:"Jump Rope",cat:"Cardio",desc:"Alternate regular bounce, boxer skip, and high knees.",reps:"Full dur",equip:"Jump Rope"},
+      {id:"mt-climbers",name:"Mountain Climbers",cat:"Cardio",desc:"Fast alternating knee drives from push-up position.",reps:"30 reps",equip:"None"},
+      {id:"burpees",name:"Burpees",cat:"Cardio",desc:"Squat, jump back, push-up, jump forward, jump up. No stopping.",reps:"10 reps",equip:"None"},
+      {id:"high-knees",name:"High Knees",cat:"Cardio",desc:"Running in place, driving knees above hip height. Pump the arms.",reps:"30 sec",equip:"None"},
+    ];
+    const EX_CATS=["All",...Array.from(new Set(EXERCISES.map(e=>e.cat)))];
+
+    // ═══════════ DRILL DATABASE ═══════════
+    const DRILLS=[
+      {id:"cc-fh",name:"Crosscourt Forehand",cat:"singles",diff:"All Levels",
+        desc:"Rally crosscourt forehands from the deuce side. Focus on consistency, depth, and heavy topspin.",
+        tips:["Early prep — racquet back before the bounce","Aim 4-6 ft above the net for depth","Recover to center after each shot","Full follow-through over the shoulder"],
+        youtubeId:null,courtType:"singles",
+        players:[{id:"A",x:72,y:92,color:BH.shotBlue},{id:"B",x:28,y:8,color:BH.shotRed}],
+        steps:[
+          {t:"hit",f:[72,92],to:[28,12],c:BH.shotBlue,n:"1",shot:"forehand",hitter:"A"},
+          {t:"move",f:[72,92],to:[50,90],c:BH.shotBlue},
+          {t:"hit",f:[28,12],to:[72,88],c:BH.shotRed,n:"2",shot:"forehand",hitter:"B"},
+          {t:"move",f:[28,8],to:[50,10],c:BH.shotRed},
+          {t:"hit",f:[72,88],to:[28,12],c:BH.shotBlue,n:"3",shot:"forehand",hitter:"A"},
+        ]},
+      {id:"cc-bh",name:"Crosscourt Backhand",cat:"singles",diff:"All Levels",
+        desc:"Rally crosscourt backhands from the ad side. Emphasize depth and placement.",
+        tips:["Full unit turn with shoulders","Step into the ball","Extend through contact","Drive through — don't roll over"],
+        youtubeId:null,courtType:"singles",
+        players:[{id:"A",x:28,y:92,color:BH.shotBlue},{id:"B",x:72,y:8,color:BH.shotRed}],
+        steps:[
+          {t:"hit",f:[28,92],to:[72,12],c:BH.shotBlue,n:"1",shot:"backhand",hitter:"A"},
+          {t:"move",f:[28,92],to:[50,90],c:BH.shotBlue},
+          {t:"hit",f:[72,12],to:[28,88],c:BH.shotRed,n:"2",shot:"backhand",hitter:"B"},
+          {t:"move",f:[72,8],to:[50,10],c:BH.shotRed},
+        ]},
+      {id:"dtl-fh",name:"Down the Line Forehand",cat:"singles",diff:"Intermediate",
+        desc:"Forehands straight down the line from the deuce side. Aggressive — commit to it.",
+        tips:["Contact slightly in front","Drive straight through the ball","Aim for the back third","Weapon shot — conviction"],
+        youtubeId:null,courtType:"singles",
+        players:[{id:"A",x:72,y:92,color:BH.shotBlue},{id:"B",x:72,y:8,color:BH.shotRed}],
+        steps:[
+          {t:"hit",f:[72,92],to:[72,12],c:BH.shotBlue,n:"1",shot:"forehand",hitter:"A"},
+          {t:"move",f:[72,92],to:[55,88],c:BH.shotBlue},
+          {t:"hit",f:[72,12],to:[72,88],c:BH.shotRed,n:"2",shot:"forehand",hitter:"B"},
+        ]},
+      {id:"io-fh",name:"Inside-Out Forehand",cat:"singles",diff:"Advanced",
+        desc:"Run around the backhand to hit an inside-out forehand crosscourt. Key rally-domination pattern.",
+        tips:["Quick adjustment steps","Load on outside (right) foot","Drive crosscourt with spin","Recover to center quickly"],
+        youtubeId:null,courtType:"singles",
+        players:[{id:"A",x:50,y:90,color:BH.shotBlue},{id:"B",x:72,y:8,color:BH.shotRed}],
+        steps:[
+          {t:"hit",f:[72,12],to:[35,85],c:BH.shotRed,n:"1",note:"To BH side",shot:"forehand",hitter:"B"},
+          {t:"move",f:[50,90],to:[30,88],c:BH.shotBlue,note:"Run around BH"},
+          {t:"hit",f:[30,88],to:[72,12],c:BH.shotBlue,n:"2",note:"Inside-out FH!",shot:"forehand",hitter:"A"},
+          {t:"move",f:[30,88],to:[50,90],c:BH.shotBlue,note:"Recover"},
+        ]},
+      {id:"serve1",name:"Serve + First Ball",cat:"singles",diff:"Intermediate",
+        desc:"Serve wide to deuce court, then attack the open court with the first ball.",
+        tips:["Hit your spot — wide","Split step as opponent returns","Attack open court","Ready to close if short"],
+        youtubeId:null,courtType:"singles",
+        players:[{id:"S",x:55,y:98,color:BH.shotBlue},{id:"R",x:50,y:5,color:BH.shotRed}],
+        steps:[
+          {t:"hit",f:[55,98],to:[82,28],c:BH.shotGold,n:"1",note:"Wide serve",shot:"serve",hitter:"S"},
+          {t:"move",f:[50,5],to:[85,12],c:BH.shotRed,note:"Pushed wide"},
+          {t:"hit",f:[85,12],to:[40,82],c:BH.shotRed,n:"2",note:"CC return",shot:"forehand",hitter:"R"},
+          {t:"move",f:[55,98],to:[42,88],c:BH.shotBlue},
+          {t:"hit",f:[42,88],to:[75,10],c:BH.shotBlue,n:"3",note:"Attack open!",shot:"forehand",hitter:"S"},
+        ]},
+      {id:"app-vol",name:"Approach + Volley",cat:"singles",diff:"Intermediate",
+        desc:"Attack a short ball with approach down the line, close to net, finish with crosscourt volley.",
+        tips:["Approach DTL to cut angles","Placement over power","Split step closing to net","Volley crosscourt"],
+        youtubeId:null,courtType:"singles",
+        players:[{id:"A",x:50,y:85,color:BH.shotBlue},{id:"B",x:50,y:8,color:BH.shotRed}],
+        steps:[
+          {t:"hit",f:[50,8],to:[65,62],c:BH.shotRed,n:"1",note:"Short ball!",shot:"slice_fh",hitter:"B"},
+          {t:"move",f:[50,85],to:[65,62],c:BH.shotBlue,note:"Move in"},
+          {t:"hit",f:[65,62],to:[72,8],c:BH.shotBlue,n:"2",note:"Approach DTL",shot:"forehand",hitter:"A"},
+          {t:"move",f:[65,62],to:[62,54],c:BH.shotBlue,note:"Close to net"},
+          {t:"hit",f:[72,8],to:[30,75],c:BH.shotRed,n:"3",note:"Passing attempt",shot:"forehand",hitter:"B"},
+          {t:"hit",f:[62,54],to:[25,8],c:BH.shotBlue,n:"4",note:"Volley winner!",shot:"fh_volley",hitter:"A"},
+        ]},
+      {id:"dbl-poach",name:"Doubles: Poach",cat:"doubles",diff:"Intermediate",
+        desc:"Baseline player rallies crosscourt while net player reads and poaches.",
+        tips:["Net: move on opponent's contact","Baseline: keep it crosscourt","Poach decisively","Both cover after"],
+        youtubeId:null,courtType:"doubles",
+        players:[{id:"A1",x:72,y:90,color:BH.shotBlue},{id:"A2",x:32,y:58,color:BH.shotBlue},
+          {id:"B1",x:28,y:10,color:BH.shotRed},{id:"B2",x:68,y:42,color:BH.shotRed}],
+        steps:[
+          {t:"hit",f:[72,90],to:[28,14],c:BH.shotBlue,n:"1",shot:"forehand",hitter:"A1"},
+          {t:"hit",f:[28,14],to:[68,86],c:BH.shotRed,n:"2",shot:"forehand",hitter:"B1"},
+          {t:"hit",f:[68,86],to:[28,14],c:BH.shotBlue,n:"3",shot:"forehand",hitter:"A1"},
+          {t:"move",f:[32,58],to:[55,50],c:BH.shotGold,note:"POACH!"},
+          {t:"hit",f:[28,14],to:[52,52],c:BH.shotRed,n:"4",shot:"forehand",hitter:"B1"},
+          {t:"hit",f:[55,50],to:[82,15],c:BH.shotGold,n:"5",note:"Volley!",shot:"fh_volley",hitter:"A2"},
+        ]},
+      {id:"dbl-sv",name:"Doubles: Serve + Volley",cat:"doubles",diff:"Advanced",
+        desc:"Serve and follow to net. Partner holds net. Both close to finish.",
+        tips:["Serve wide or at body","1st volley deep, then close","Partner alert for poach","Dominate net together"],
+        youtubeId:null,courtType:"doubles",
+        players:[{id:"S",x:58,y:98,color:BH.shotBlue},{id:"N1",x:28,y:56,color:BH.shotBlue},
+          {id:"R",x:28,y:5,color:BH.shotRed},{id:"N2",x:72,y:44,color:BH.shotRed}],
+        steps:[
+          {t:"hit",f:[58,98],to:[15,30],c:BH.shotGold,n:"1",note:"Wide serve",shot:"serve",hitter:"S"},
+          {t:"move",f:[58,98],to:[58,68],c:BH.shotBlue,note:"Approach"},
+          {t:"hit",f:[15,12],to:[55,66],c:BH.shotRed,n:"2",note:"Return",shot:"forehand",hitter:"R"},
+          {t:"hit",f:[58,66],to:[22,12],c:BH.shotBlue,n:"3",note:"Deep volley",shot:"fh_volley",hitter:"S"},
+          {t:"move",f:[58,68],to:[58,56],c:BH.shotBlue,note:"Close"},
+          {t:"hit",f:[22,12],to:[42,52],c:BH.shotRed,n:"4",shot:"forehand",hitter:"R"},
+          {t:"hit",f:[28,56],to:[80,15],c:BH.shotGold,n:"5",note:"Put away!",shot:"fh_volley",hitter:"N1"},
+        ]},
     ];
 
-    // ═══════════════════════════════════════════════════════════════
-    //  CIRCUIT DATABASE
-    // ═══════════════════════════════════════════════════════════════
-    const CIRCUITS = [
-      {
-        id: "core", name: "Core Strength", dur: 45, rest: 15, rounds: 3,
-        stations: [
-          { name: "Med Ball Twists", desc: "Seated Russian twists with medicine ball. Keep feet off ground, rotate fully side to side.", reps: "20 reps", equip: "Med Ball 8–12 lb", focus: "Core Rotation" },
-          { name: "Box Jumps", desc: "Explosive jump onto box, step down carefully. Land softly with knees over toes.", reps: "12 reps", equip: "20–24\" Box", focus: "Explosive Power" },
-          { name: "Plank Hold", desc: "Forearm plank with tight core. Hips level, glutes engaged — don't let hips sag.", reps: "Full duration", equip: "None", focus: "Core Stability" },
-          { name: "Wall Throws", desc: "Medicine ball chest throws against wall. Explosive push, catch on rebound, repeat fast.", reps: "15 reps", equip: "Med Ball 8–12 lb", focus: "Upper Body Power" },
-          { name: "Lateral Lunges", desc: "Alternating deep lateral lunges. Push off explosively to return to center.", reps: "10 each side", equip: "None", focus: "Lateral Movement" },
-          { name: "Mountain Climbers", desc: "Fast mountain climbers from push-up position. Drive knees to chest alternating rapidly.", reps: "30 total", equip: "None", focus: "Cardio + Core" },
-        ],
-      },
-      {
-        id: "agility", name: "Tennis Agility", dur: 40, rest: 20, rounds: 3,
-        stations: [
-          { name: "Ladder Drills", desc: "Quick feet through agility ladder using in-in-out-out or icky shuffle patterns.", reps: "4 lengths", equip: "Agility Ladder", focus: "Footwork Speed" },
-          { name: "Cone Shuffles", desc: "Defensive lateral shuffles between two cones 10 feet apart. Stay low, stay athletic.", reps: "8 trips", equip: "2 Cones", focus: "Lateral Quickness" },
-          { name: "Split Step Jumps", desc: "Continuous split step jumps. Land balanced on balls of feet, ready to move any direction.", reps: "20 reps", equip: "None", focus: "Reaction Prep" },
-          { name: "Sprint + Backpedal", desc: "Sprint 20 ft forward, backpedal to start. Stay on balls of feet, eyes up.", reps: "6 trips", equip: "None", focus: "Court Coverage" },
-          { name: "Jump Rope", desc: "Continuous jump rope. Alternate between regular bounce, boxer skip, and high knees.", reps: "Full duration", equip: "Jump Rope", focus: "Footwork + Cardio" },
-        ],
-      },
-    ];
-
-    // ═══════════════════════════════════════════════════════════════
-    //  SVG TENNIS COURT
-    // ═══════════════════════════════════════════════════════════════
-    function Court({ courtType = "singles", players = [], steps = [], activeStep = -1, showAll = false }) {
-      const L = CRT.PAD, R = CRT.W - CRT.PAD, T = CRT.PAD, B = CRT.H - CRT.PAD;
-      const visibleSteps = steps.filter((_, i) => showAll || i <= activeStep);
-
-      const arrow = (s, i) => {
-        const x1 = mapX(s.f[0]), y1 = mapY(s.f[1]), x2 = mapX(s.to[0]), y2 = mapY(s.to[1]);
-        const ang = Math.atan2(y2 - y1, x2 - x1);
-        const hl = 10;
-        const ax = x2 - hl * Math.cos(ang - 0.45), ay = y2 - hl * Math.sin(ang - 0.45);
-        const bx = x2 - hl * Math.cos(ang + 0.45), by = y2 - hl * Math.sin(ang + 0.45);
-        const isActive = i === activeStep && !showAll;
-        const op = isActive ? 1 : showAll ? 0.85 : 0.7;
-        const dashed = s.t === "move";
-        const midXVal = (x1 + x2) / 2, midYVal = (y1 + y2) / 2;
-        return (
-          <g key={"step-" + i} opacity={op}>
-            <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={s.c} strokeWidth={dashed ? 2.5 : 3}
-              strokeDasharray={dashed ? "10,5" : "none"} strokeLinecap="round" />
-            <polygon points={x2+","+y2+" "+ax+","+ay+" "+bx+","+by} fill={s.c} />
-            {s.n && (
-              <g>
-                <circle cx={midXVal} cy={midYVal} r={11} fill={BH.white} stroke={s.c} strokeWidth={2} />
-                <text x={midXVal} y={midYVal + 1} textAnchor="middle" dominantBaseline="middle"
-                  fontSize="11" fontWeight="700" fill={s.c}>{s.n}</text>
-              </g>
-            )}
-            {isActive && s.note && (
-              <g>
-                <rect x={midXVal + 14} y={midYVal - 12} width={s.note.length * 6.5 + 12} height={22} rx={4}
-                  fill={BH.navyDark} opacity={0.9} />
-                <text x={midXVal + 20} y={midYVal + 1} fontSize="10" fill={BH.white} fontWeight="500">{s.note}</text>
-              </g>
-            )}
-          </g>
-        );
-      };
-
+    // ═══════════ PLAYER ICON ═══════════
+    function PlayerIcon({px,py,color,label,shot,courtY}) {
+      const up=courtY>50;
+      const baseR=up?0:180;
+      if(!shot) return (
+        <g><circle cx={px} cy={py} r={14} fill={color} stroke={BH.white} strokeWidth={2.5}/>
+          <circle cx={px} cy={py+(up?-18:18)} r={3} fill={color} stroke={BH.white} strokeWidth={1.5}/>
+          <text x={px} y={py+1} textAnchor="middle" dominantBaseline="middle" fontSize="10" fontWeight="800" fill={BH.white}>{label}</text></g>);
+      const pose=POSES[shot]||POSES.forehand;
+      const bRot=BODY_ROT[shot]||0;
       return (
-        <svg viewBox={"0 0 " + CRT.W + " " + CRT.H} style={{ width: "100%", maxWidth: 360, background: BH.courtDark, borderRadius: 12 }}>
-          <rect x={L} y={T} width={R - L} height={B - T} fill={BH.courtGreen} rx={2} />
-          <rect x={L} y={T} width={R - L} height={B - T} fill="none" stroke={BH.white} strokeWidth={2} />
-          {courtType === "singles" ? (
-            <g>
-              <line x1={SL.l} y1={T} x2={SL.l} y2={B} stroke={BH.white} strokeWidth={1.5} />
-              <line x1={SL.r} y1={T} x2={SL.r} y2={B} stroke={BH.white} strokeWidth={1.5} />
-            </g>
-          ) : (
-            <g>
-              <line x1={SL.l} y1={T} x2={SL.l} y2={B} stroke={BH.white} strokeWidth={1} opacity={0.5} />
-              <line x1={SL.r} y1={T} x2={SL.r} y2={B} stroke={BH.white} strokeWidth={1} opacity={0.5} />
-            </g>
-          )}
-          <line x1={SL.l} y1={SVC.far} x2={SL.r} y2={SVC.far} stroke={BH.white} strokeWidth={1.5} />
-          <line x1={SL.l} y1={SVC.near} x2={SL.r} y2={SVC.near} stroke={BH.white} strokeWidth={1.5} />
-          <line x1={mapX(50)} y1={SVC.far} x2={mapX(50)} y2={SVC.near} stroke={BH.white} strokeWidth={1.5} />
-          <line x1={mapX(50)} y1={T} x2={mapX(50)} y2={T + 12} stroke={BH.white} strokeWidth={1.5} />
-          <line x1={mapX(50)} y1={B} x2={mapX(50)} y2={B - 12} stroke={BH.white} strokeWidth={1.5} />
-          <line x1={L - 8} y1={NET_Y} x2={R + 8} y2={NET_Y} stroke={BH.white} strokeWidth={3} />
-          <line x1={L - 8} y1={NET_Y} x2={L - 8} y2={NET_Y - 8} stroke={BH.white} strokeWidth={2} />
-          <line x1={R + 8} y1={NET_Y} x2={R + 8} y2={NET_Y - 8} stroke={BH.white} strokeWidth={2} />
-          {visibleSteps.map((s, i) => arrow(s, i))}
-          {players.map((p) => (
-            <g key={p.id}>
-              <circle cx={mapX(p.x)} cy={mapY(p.y)} r={16} fill={p.color} stroke={BH.white} strokeWidth={2.5} />
-              <text x={mapX(p.x)} y={mapY(p.y) + 1} textAnchor="middle" dominantBaseline="middle"
-                fontSize="11" fontWeight="800" fill={BH.white}>{p.id}</text>
-            </g>
-          ))}
-        </svg>
-      );
+        <g transform={"translate("+px+","+py+") rotate("+(baseR+bRot)+")"}>
+          <ellipse cx={0} cy={0} rx={10} ry={13} fill={color} stroke={BH.white} strokeWidth={2.5}/>
+          <circle cx={0} cy={-11} r={4.5} fill={color} stroke={BH.white} strokeWidth={1.5}/>
+          <line x1={pose[0]} y1={pose[1]} x2={pose[2]} y2={pose[3]} stroke={BH.white} strokeWidth={2.5} strokeLinecap="round"/>
+          <ellipse cx={pose[2]} cy={pose[3]} rx={5} ry={3} fill="none" stroke={BH.white} strokeWidth={1.5}
+            transform={"rotate("+pose[4]+","+pose[2]+","+pose[3]+")"}/>
+          <text x={0} y={2} textAnchor="middle" dominantBaseline="middle" fontSize="9" fontWeight="800" fill={BH.white}>{label}</text>
+        </g>);
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    //  DRILL VIEWER
-    // ═══════════════════════════════════════════════════════════════
-    function DrillViewer({ drill }) {
-      const [step, setStep] = useState(-1);
-      const [playing, setPlaying] = useState(false);
-      const timer = useRef(null);
+    // ═══════════ COURT ═══════════
+    function Court({courtType,players,steps,activeStep,showAll}) {
+      const L=CRT.PAD,R=CRT.W-CRT.PAD,T=CRT.PAD,B=CRT.H-CRT.PAD;
+      const vis=steps.filter((_,i)=>showAll||i<=activeStep);
+      const aHit=(!showAll&&activeStep>=0&&activeStep<steps.length)?steps[activeStep]:null;
+      const hId=(aHit&&aHit.t==="hit")?aHit.hitter:null;
+      const hShot=(aHit&&aHit.t==="hit")?aHit.shot:null;
+      const arrow=(s,i)=>{
+        const x1=mX(s.f[0]),y1=mY(s.f[1]),x2=mX(s.to[0]),y2=mY(s.to[1]);
+        const a=Math.atan2(y2-y1,x2-x1),hl=10;
+        const ax=x2-hl*Math.cos(a-0.45),ay=y2-hl*Math.sin(a-0.45);
+        const bx=x2-hl*Math.cos(a+0.45),by=y2-hl*Math.sin(a+0.45);
+        const isA=i===activeStep&&!showAll;
+        const op=isA?1:showAll?0.8:0.65;
+        const dash=s.t==="move";
+        const mx2=(x1+x2)/2,my2=(y1+y2)/2;
+        return(<g key={"s"+i} opacity={op}>
+          <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={s.c} strokeWidth={dash?2.5:3} strokeDasharray={dash?"10,5":"none"} strokeLinecap="round"/>
+          <polygon points={x2+","+y2+" "+ax+","+ay+" "+bx+","+by} fill={s.c}/>
+          {s.n&&<g><circle cx={mx2} cy={my2} r={11} fill={BH.white} stroke={s.c} strokeWidth={2}/>
+            <text x={mx2} y={my2+1} textAnchor="middle" dominantBaseline="middle" fontSize="11" fontWeight="700" fill={s.c}>{s.n}</text></g>}
+          {isA&&s.note&&<g><rect x={mx2+14} y={my2-12} width={s.note.length*6.2+14} height={22} rx={4} fill={BH.navyDark} opacity={0.9}/>
+            <text x={mx2+21} y={my2+1} fontSize="10" fill={BH.white} fontWeight="500">{s.note}</text></g>}
+          {isA&&s.shot&&<g><rect x={mx2+14} y={my2+(s.note?14:-12)} width={s.shot.replace("_"," ").length*6.5+14} height={18} rx={3} fill={BH.gold} opacity={0.9}/>
+            <text x={mx2+21} y={my2+(s.note?25:-1)} fontSize="9" fill={BH.navyDark} fontWeight="700">{s.shot.replace("_"," ").toUpperCase()}</text></g>}
+        </g>);
+      };
+      return(
+        <svg viewBox={"0 0 "+CRT.W+" "+CRT.H} style={{width:"100%",maxWidth:360,background:BH.courtDark,borderRadius:12}}>
+          <rect x={L} y={T} width={R-L} height={B-T} fill={BH.courtGreen} rx={2}/>
+          <rect x={L} y={T} width={R-L} height={B-T} fill="none" stroke={BH.white} strokeWidth={2}/>
+          {courtType==="singles"?<g><line x1={SL.l} y1={T} x2={SL.l} y2={B} stroke={BH.white} strokeWidth={1.5}/>
+            <line x1={SL.r} y1={T} x2={SL.r} y2={B} stroke={BH.white} strokeWidth={1.5}/></g>:
+            <g><line x1={SL.l} y1={T} x2={SL.l} y2={B} stroke={BH.white} strokeWidth={1} opacity={0.5}/>
+            <line x1={SL.r} y1={T} x2={SL.r} y2={B} stroke={BH.white} strokeWidth={1} opacity={0.5}/></g>}
+          <line x1={SL.l} y1={SVC.far} x2={SL.r} y2={SVC.far} stroke={BH.white} strokeWidth={1.5}/>
+          <line x1={SL.l} y1={SVC.near} x2={SL.r} y2={SVC.near} stroke={BH.white} strokeWidth={1.5}/>
+          <line x1={mX(50)} y1={SVC.far} x2={mX(50)} y2={SVC.near} stroke={BH.white} strokeWidth={1.5}/>
+          <line x1={mX(50)} y1={T} x2={mX(50)} y2={T+12} stroke={BH.white} strokeWidth={1.5}/>
+          <line x1={mX(50)} y1={B} x2={mX(50)} y2={B-12} stroke={BH.white} strokeWidth={1.5}/>
+          <line x1={L-8} y1={NET_Y} x2={R+8} y2={NET_Y} stroke={BH.white} strokeWidth={3}/>
+          <line x1={L-8} y1={NET_Y} x2={L-8} y2={NET_Y-8} stroke={BH.white} strokeWidth={2}/>
+          <line x1={R+8} y1={NET_Y} x2={R+8} y2={NET_Y-8} stroke={BH.white} strokeWidth={2}/>
+          {vis.map((s,i)=>arrow(s,i))}
+          {players.map(p=><PlayerIcon key={p.id} px={mX(p.x)} py={mY(p.y)} color={p.color} label={p.id} shot={p.id===hId?hShot:null} courtY={p.y}/>)}
+        </svg>);
+    }
 
-      useEffect(() => { setStep(-1); setPlaying(false); }, [drill && drill.id]);
-      useEffect(() => {
-        if (!playing || !drill) return;
-        timer.current = setInterval(() => {
-          setStep((s) => {
-            if (s >= drill.steps.length - 1) { setPlaying(false); return s; }
-            return s + 1;
-          });
-        }, 1200);
-        return () => clearInterval(timer.current);
-      }, [playing, drill]);
-
-      if (!drill) return (
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: BH.g400, fontSize: 18 }}>
-          Select a drill to view the court diagram
-        </div>
-      );
-
-      const maxStep = drill.steps.length - 1;
-      const Btn = ({ onClick, disabled, children, primary }) => (
-        <button onClick={onClick} disabled={disabled} style={{
-          padding: "8px 16px", borderRadius: 8, border: "none", cursor: disabled ? "default" : "pointer",
-          background: disabled ? BH.g200 : primary ? BH.navy : BH.white,
-          color: disabled ? BH.g400 : primary ? BH.white : BH.navy,
-          fontWeight: 600, fontSize: 14, boxShadow: disabled ? "none" : "0 1px 3px rgba(0,0,0,0.12)",
-          opacity: disabled ? 0.5 : 1, transition: "all 0.15s",
-        }}>{children}</button>
-      );
-
-      return (
-        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-          <div style={{ display: "flex", gap: 24, flexWrap: "wrap", alignItems: "flex-start" }}>
-            <div style={{ flex: "0 0 auto" }}>
-              <Court courtType={drill.courtType} players={drill.players} steps={drill.steps} activeStep={step} />
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 12 }}>
-                <Btn onClick={() => { setStep(-1); setPlaying(false); }}>Reset</Btn>
-                <Btn onClick={() => setStep(Math.max(-1, step - 1))} disabled={step <= -1}>Back</Btn>
-                <Btn primary onClick={() => {
-                  if (step >= maxStep) { setStep(-1); setTimeout(() => setPlaying(true), 100); }
-                  else setPlaying(!playing);
-                }}>{playing ? "Pause" : step >= maxStep ? "Replay" : "Play"}</Btn>
-                <Btn onClick={() => { setStep(Math.min(maxStep, step + 1)); setPlaying(false); }} disabled={step >= maxStep}>Next</Btn>
-                <Btn onClick={() => { setStep(maxStep); setPlaying(false); }}>All</Btn>
-              </div>
-              <div style={{ textAlign: "center", marginTop: 6, fontSize: 13, color: BH.g500 }}>
-                {step === -1 ? "Ready — press Play" : "Step " + (step + 1) + " of " + (maxStep + 1)}
-              </div>
+    // ═══════════ DRILL VIEWER ═══════════
+    function DrillViewer({drill}) {
+      const [step,setStep]=useState(-1);
+      const [playing,setPlaying]=useState(false);
+      const tmr=useRef(null);
+      useEffect(()=>{setStep(-1);setPlaying(false)},[drill&&drill.id]);
+      useEffect(()=>{if(!playing||!drill)return;tmr.current=setInterval(()=>{setStep(s=>{if(s>=drill.steps.length-1){setPlaying(false);return s}return s+1})},1200);return()=>clearInterval(tmr.current)},[playing,drill]);
+      if(!drill) return <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100%",color:BH.g400,fontSize:18}}>Select a drill to view</div>;
+      const mx2=drill.steps.length-1;
+      const Btn=({onClick,disabled,children,primary})=>(<button onClick={onClick} disabled={disabled} style={{padding:"8px 16px",borderRadius:8,border:"none",cursor:disabled?"default":"pointer",background:disabled?BH.g200:primary?BH.navy:BH.white,color:disabled?BH.g400:primary?BH.white:BH.navy,fontWeight:600,fontSize:14,boxShadow:disabled?"none":"0 1px 3px rgba(0,0,0,0.12)",opacity:disabled?0.5:1}}>{children}</button>);
+      return(<div style={{display:"flex",flexDirection:"column",gap:20}}>
+        <div style={{display:"flex",gap:24,flexWrap:"wrap",alignItems:"flex-start"}}>
+          <div style={{flex:"0 0 auto"}}>
+            <Court courtType={drill.courtType} players={drill.players} steps={drill.steps} activeStep={step} showAll={false}/>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginTop:12}}>
+              <Btn onClick={()=>{setStep(-1);setPlaying(false)}}>Reset</Btn>
+              <Btn onClick={()=>setStep(Math.max(-1,step-1))} disabled={step<=-1}>Back</Btn>
+              <Btn primary onClick={()=>{if(step>=mx2){setStep(-1);setTimeout(()=>setPlaying(true),100)}else setPlaying(!playing)}}>{playing?"Pause":step>=mx2?"Replay":"Play"}</Btn>
+              <Btn onClick={()=>{setStep(Math.min(mx2,step+1));setPlaying(false)}} disabled={step>=mx2}>Next</Btn>
+              <Btn onClick={()=>{setStep(mx2);setPlaying(false)}}>All</Btn>
             </div>
-            <div style={{ flex: 1, minWidth: 260 }}>
-              <div style={{ marginBottom: 4 }}>
-                <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: BH.gold }}>{drill.cat}</span>
-                <span style={{ fontSize: 11, color: BH.g400, marginLeft: 12 }}>{drill.diff}</span>
-              </div>
-              <h2 style={{ margin: "0 0 10px", fontSize: 24, fontWeight: 800, color: BH.navy }}>{drill.name}</h2>
-              <p style={{ margin: "0 0 16px", fontSize: 15, color: BH.g700, lineHeight: 1.6 }}>{drill.desc}</p>
-              <div style={{ background: BH.g100, borderRadius: 10, padding: 16 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: BH.navy, marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.5 }}>Coaching Points</div>
-                {drill.tips.map((t, i) => (
-                  <div key={"tip-" + i} style={{ display: "flex", gap: 8, marginBottom: 6, fontSize: 14, color: BH.g700 }}>
-                    <span style={{ color: BH.gold, fontWeight: 700, flexShrink: 0 }}>{i + 1}.</span>
-                    <span>{t}</span>
-                  </div>
-                ))}
-              </div>
-              {drill.youtubeId && (
-                <div style={{ marginTop: 16, borderRadius: 10, overflow: "hidden", aspectRatio: "16/9" }}>
-                  <iframe width="100%" height="100%" style={{ border: "none" }}
-                    src={"https://www.youtube.com/embed/" + drill.youtubeId + (drill.youtubeStart ? "?start=" + drill.youtubeStart : "")}
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
-                </div>
-              )}
+            <div style={{textAlign:"center",marginTop:6,fontSize:13,color:BH.g500}}>{step===-1?"Ready — press Play":"Step "+(step+1)+" of "+(mx2+1)}</div>
+          </div>
+          <div style={{flex:1,minWidth:260}}>
+            <div style={{marginBottom:4}}><span style={{fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:1,color:BH.gold}}>{drill.cat}</span>
+              <span style={{fontSize:11,color:BH.g400,marginLeft:12}}>{drill.diff}</span></div>
+            <h2 style={{margin:"0 0 10px",fontSize:24,fontWeight:800,color:BH.navy}}>{drill.name}</h2>
+            <p style={{margin:"0 0 16px",fontSize:15,color:BH.g700,lineHeight:1.6}}>{drill.desc}</p>
+            <div style={{background:BH.g100,borderRadius:10,padding:16}}>
+              <div style={{fontSize:13,fontWeight:700,color:BH.navy,marginBottom:8,textTransform:"uppercase",letterSpacing:.5}}>Coaching Points</div>
+              {drill.tips.map((t,i)=>(<div key={"t"+i} style={{display:"flex",gap:8,marginBottom:6,fontSize:14,color:BH.g700}}><span style={{color:BH.gold,fontWeight:700,flexShrink:0}}>{i+1}.</span><span>{t}</span></div>))}
             </div>
+            {drill.youtubeId&&<div style={{marginTop:16,borderRadius:10,overflow:"hidden",aspectRatio:"16/9"}}><iframe width="100%" height="100%" style={{border:"none"}} src={"https://www.youtube.com/embed/"+drill.youtubeId} allow="accelerometer;autoplay;clipboard-write;encrypted-media;gyroscope;picture-in-picture" allowFullScreen/></div>}
           </div>
         </div>
-      );
+      </div>);
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    //  CIRCUIT RING
-    // ═══════════════════════════════════════════════════════════════
-    function CircuitRing({ stations, activeIdx = -1, timerIdx = -1, onSelect }) {
-      const n = stations.length;
-      const size = 320;
-      const cxVal = size / 2, cyVal = size / 2, rad = 120;
-      const pos = (i) => {
-        const a = (i / n) * 2 * Math.PI - Math.PI / 2;
-        return { x: cxVal + rad * Math.cos(a), y: cyVal + rad * Math.sin(a) };
-      };
-      return (
-        <svg viewBox={"0 0 " + size + " " + size} style={{ width: "100%", maxWidth: size }}>
-          {stations.map((_, i) => {
-            const a = pos(i), b = pos((i + 1) % n);
-            return <line key={"line-" + i} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={BH.g300} strokeWidth={2} />;
-          })}
-          {stations.map((st, i) => {
-            const p = pos(i);
-            const isActive = i === activeIdx;
-            const isTiming = i === timerIdx;
-            const fill = isTiming ? BH.gold : isActive ? BH.navy : BH.white;
-            const textColor = (isTiming || isActive) ? BH.white : BH.navy;
-            const words = st.name.split(" ");
-            const line1 = words.slice(0, Math.ceil(words.length / 2)).join(" ");
-            const line2 = words.slice(Math.ceil(words.length / 2)).join(" ");
-            return (
-              <g key={"st-" + i} onClick={() => onSelect(i)} style={{ cursor: "pointer" }}>
-                <circle cx={p.x} cy={p.y} r={38} fill={fill} stroke={isTiming ? BH.goldDim : BH.navy}
-                  strokeWidth={isTiming ? 3 : 2}
-                  style={{ transition: "all 0.3s", filter: isTiming ? "drop-shadow(0 0 8px rgba(201,162,39,0.5))" : "none" }} />
-                <text x={p.x} y={p.y - (line2 ? 5 : 0)} textAnchor="middle" dominantBaseline="middle"
-                  fontSize={line1.length > 10 ? 9 : 10} fontWeight="700" fill={textColor}>{line1}</text>
-                {line2 && <text x={p.x} y={p.y + 10} textAnchor="middle" dominantBaseline="middle"
-                  fontSize={line2.length > 10 ? 9 : 10} fontWeight="700" fill={textColor}>{line2}</text>}
-                <text x={p.x} y={p.y + (line2 ? 24 : 18)} textAnchor="middle" fontSize="8" fill={isTiming || isActive ? "rgba(255,255,255,0.7)" : BH.g400}>
-                  {(i + 1) + "/" + n}
-                </text>
-              </g>
-            );
-          })}
-          <text x={cxVal} y={cyVal - 6} textAnchor="middle" fontSize="11" fontWeight="700" fill={BH.navy}>CIRCUIT</text>
-          <text x={cxVal} y={cyVal + 10} textAnchor="middle" fontSize="10" fill={BH.g500}>{n} stations</text>
-        </svg>
-      );
+    // ═══════════ CIRCUIT RING ═══════════
+    function CircuitRing({stations,activeIdx,timerIdx,onSelect}) {
+      const n=stations.length;
+      if(n===0)return<div style={{width:320,height:320,display:"flex",alignItems:"center",justifyContent:"center",border:"2px dashed "+BH.g300,borderRadius:"50%",color:BH.g400,fontSize:14,textAlign:"center",padding:40}}>Select exercises to build your circuit</div>;
+      const size=320,cx=size/2,cy=size/2;
+      const rad=Math.min(120,Math.max(80,140-n*4));
+      const nr=Math.min(38,Math.max(24,44-n*2));
+      const fs=Math.min(10,Math.max(7,11-n*0.3));
+      const pos=i=>{const a=(i/n)*2*Math.PI-Math.PI/2;return{x:cx+rad*Math.cos(a),y:cy+rad*Math.sin(a)}};
+      return(<svg viewBox={"0 0 "+size+" "+size} style={{width:"100%",maxWidth:size}}>
+        {stations.map((_,i)=>{const a=pos(i),b=pos((i+1)%n);return<line key={"l"+i} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={BH.g300} strokeWidth={2}/>})}
+        {stations.map((st,i)=>{const p=pos(i),isA=i===activeIdx,isT=i===timerIdx;
+          const fill=isT?BH.gold:isA?BH.navy:BH.white;const tc=(isT||isA)?BH.white:BH.navy;
+          const w=st.name.split(" ");const l1=w.slice(0,Math.ceil(w.length/2)).join(" ");const l2=w.slice(Math.ceil(w.length/2)).join(" ");
+          return(<g key={"c"+i} onClick={()=>onSelect(i)} style={{cursor:"pointer"}}>
+            <circle cx={p.x} cy={p.y} r={nr} fill={fill} stroke={isT?BH.goldDim:BH.navy} strokeWidth={isT?3:2} style={{transition:"all 0.3s",filter:isT?"drop-shadow(0 0 8px rgba(201,162,39,0.5))":"none"}}/>
+            <text x={p.x} y={p.y-(l2?4:0)} textAnchor="middle" dominantBaseline="middle" fontSize={fs} fontWeight="700" fill={tc}>{l1}</text>
+            {l2&&<text x={p.x} y={p.y+fs+1} textAnchor="middle" dominantBaseline="middle" fontSize={fs} fontWeight="700" fill={tc}>{l2}</text>}
+          </g>)})}
+        <text x={cx} y={cy-6} textAnchor="middle" fontSize="11" fontWeight="700" fill={BH.navy}>CIRCUIT</text>
+        <text x={cx} y={cy+10} textAnchor="middle" fontSize="10" fill={BH.g500}>{n} stations</text>
+      </svg>);
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    //  CIRCUIT TIMER
-    // ═══════════════════════════════════════════════════════════════
-    function CircuitTimer({ circuit, onStationChange }) {
-      const [state, setState] = useState("idle");
-      const [round, setRound] = useState(1);
-      const [stIdx, setStIdx] = useState(0);
-      const [timeLeft, setTimeLeft] = useState(circuit.dur);
-      const intervalRef = useRef(null);
-
-      useEffect(() => { doReset(); }, [circuit.id]);
-
-      const doReset = () => {
-        clearInterval(intervalRef.current);
-        setState("idle"); setRound(1); setStIdx(0); setTimeLeft(circuit.dur);
-        if (onStationChange) onStationChange(-1);
-      };
-
-      const doStart = () => {
-        if (state === "done") { doReset(); return; }
-        if (state === "idle") {
-          setState("station"); setTimeLeft(circuit.dur);
-          if (onStationChange) onStationChange(0);
-          snd.switch();
-        }
-        clearInterval(intervalRef.current);
-        intervalRef.current = setInterval(() => doTick(), 1000);
-      };
-
-      const doPause = () => clearInterval(intervalRef.current);
-
-      const doTick = useCallback(() => {
-        setTimeLeft((t) => {
-          if (t > 1) {
-            if (t === 4 || t === 3 || t === 2) snd.tick();
-            return t - 1;
-          }
-          setState((st) => {
-            if (st === "station") {
-              setStIdx((si) => {
-                const nextSi = si + 1;
-                if (nextSi >= circuit.stations.length) {
-                  setRound((r) => {
-                    if (r >= circuit.rounds) {
-                      clearInterval(intervalRef.current);
-                      snd.done();
-                      if (onStationChange) onStationChange(-1);
-                      setState("done");
-                      return r;
-                    }
-                    setTimeLeft(circuit.rest);
-                    setState("rest");
-                    snd.rest();
-                    return r;
-                  });
-                  return si;
-                }
-                setTimeLeft(circuit.rest);
-                setState("rest");
-                snd.rest();
-                return si;
-              });
-              return st;
-            }
-            if (st === "rest") {
-              setStIdx((si) => {
-                const nextSi = si + 1;
-                if (nextSi >= circuit.stations.length) {
-                  setRound((r) => r + 1);
-                  if (onStationChange) onStationChange(0);
-                  setTimeLeft(circuit.dur);
-                  setState("station");
-                  snd.switch();
-                  return 0;
-                }
-                if (onStationChange) onStationChange(nextSi);
-                setTimeLeft(circuit.dur);
-                setState("station");
-                snd.switch();
-                return nextSi;
-              });
-              return st;
-            }
-            return st;
-          });
-          return 0;
-        });
-      }, [circuit]);
-
-      useEffect(() => {
-        if (state !== "idle" && state !== "done") {
-          clearInterval(intervalRef.current);
-          intervalRef.current = setInterval(() => doTick(), 1000);
-        }
-        return () => clearInterval(intervalRef.current);
-      }, [doTick, state]);
-
-      const fmtTime = (s) => String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
-      const totalDur = state === "station" ? circuit.dur : circuit.rest;
-      const pct = totalDur > 0 ? ((totalDur - timeLeft) / totalDur) * 100 : 0;
-      const currentStation = circuit.stations[stIdx];
-      const nextStation = circuit.stations[(stIdx + 1) % circuit.stations.length];
-
-      return (
-        <div style={{ background: BH.white, borderRadius: 16, padding: 24, boxShadow: "0 2px 12px rgba(0,0,0,0.08)", textAlign: "center" }}>
-          {state === "idle" && (
-            <div>
-              <div style={{ fontSize: 16, color: BH.g500, marginBottom: 8 }}>Ready to start</div>
-              <div style={{ fontSize: 14, color: BH.g400 }}>
-                {circuit.stations.length} stations &middot; {circuit.dur}s work / {circuit.rest}s rest &middot; {circuit.rounds} rounds
-              </div>
-            </div>
-          )}
-          {state === "done" && (
-            <div>
-              <div style={{ fontSize: 28, fontWeight: 800, color: BH.gold }}>COMPLETE!</div>
-              <div style={{ fontSize: 14, color: BH.g500, marginTop: 4 }}>Great work — all {circuit.rounds} rounds finished.</div>
-            </div>
-          )}
-          {(state === "station" || state === "rest") && (
-            <div>
-              <div style={{
-                display: "inline-block", padding: "4px 14px", borderRadius: 20, fontSize: 12, fontWeight: 700,
-                textTransform: "uppercase", letterSpacing: 1, marginBottom: 8,
-                background: state === "rest" ? BH.g200 : BH.navy, color: state === "rest" ? BH.g700 : BH.white,
-              }}>{state === "rest" ? "Rest" : "Station " + (stIdx + 1)}</div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: BH.navy, margin: "6px 0" }}>
-                {state === "rest" ? "Get Ready..." : currentStation.name}
-              </div>
-              <div style={{ fontSize: 52, fontWeight: 800, color: timeLeft <= 5 ? BH.shotRed : BH.navy, fontVariantNumeric: "tabular-nums", lineHeight: 1.1 }}>
-                {fmtTime(timeLeft)}
-              </div>
-              <div style={{ margin: "12px auto", width: "80%", height: 8, background: BH.g200, borderRadius: 4, overflow: "hidden" }}>
-                <div style={{ height: "100%", width: pct + "%", background: state === "rest" ? BH.g400 : BH.gold, borderRadius: 4, transition: "width 0.3s" }} />
-              </div>
-              <div style={{ fontSize: 13, color: BH.g500 }}>
-                {"Round " + round + " of " + circuit.rounds}{state === "station" && (" · Next: " + (stIdx + 1 < circuit.stations.length ? nextStation.name : "End of round"))}
-              </div>
-            </div>
-          )}
-          <div style={{ display: "flex", gap: 10, justifyContent: "center", marginTop: 16 }}>
-            {(state === "idle" || state === "done") ? (
-              <button onClick={doStart} style={{
-                padding: "12px 32px", borderRadius: 10, border: "none", cursor: "pointer",
-                background: BH.navy, color: BH.white, fontSize: 16, fontWeight: 700,
-              }}>{state === "done" ? "Restart" : "Start Timer"}</button>
-            ) : (
-              <React.Fragment>
-                <button onClick={doPause} style={{
-                  padding: "10px 24px", borderRadius: 10, border: "2px solid " + BH.navy, cursor: "pointer",
-                  background: BH.white, color: BH.navy, fontSize: 14, fontWeight: 700,
-                }}>Pause</button>
-                <button onClick={() => { clearInterval(intervalRef.current); doStart(); }} style={{
-                  padding: "10px 24px", borderRadius: 10, border: "none", cursor: "pointer",
-                  background: BH.navy, color: BH.white, fontSize: 14, fontWeight: 700,
-                }}>Resume</button>
-                <button onClick={doReset} style={{
-                  padding: "10px 24px", borderRadius: 10, border: "2px solid " + BH.g300, cursor: "pointer",
-                  background: BH.white, color: BH.g500, fontSize: 14, fontWeight: 600,
-                }}>Reset</button>
-              </React.Fragment>
-            )}
-          </div>
+    // ═══════════ CIRCUIT TIMER ═══════════
+    function CircuitTimer({stations,dur,rest,rounds,onStationChange}) {
+      const [st,setSt]=useState("idle");const [rnd,setRnd]=useState(1);const [idx,setIdx]=useState(0);const [tl,setTl]=useState(dur);const iv=useRef(null);const n=stations.length;
+      useEffect(()=>{doR()},[n,dur,rest,rounds]);
+      const doR=()=>{clearInterval(iv.current);setSt("idle");setRnd(1);setIdx(0);setTl(dur);onStationChange&&onStationChange(-1)};
+      const doS=()=>{if(st==="done"){doR();return}if(st==="idle"){setSt("station");setTl(dur);onStationChange&&onStationChange(0);snd.go()}clearInterval(iv.current);iv.current=setInterval(()=>doT(),1000)};
+      const doP=()=>clearInterval(iv.current);
+      const doT=useCallback(()=>{setTl(t=>{if(t>1){if(t===4||t===3||t===2)snd.tick();return t-1}setSt(s=>{if(s==="station"){setIdx(si=>{if(si+1>=n){setRnd(r=>{if(r>=rounds){clearInterval(iv.current);snd.done();onStationChange&&onStationChange(-1);setSt("done");return r}setTl(rest);setSt("rest");snd.rest();return r});return si}setTl(rest);setSt("rest");snd.rest();return si});return s}if(s==="rest"){setIdx(si=>{if(si+1>=n){setRnd(r=>r+1);onStationChange&&onStationChange(0);setTl(dur);setSt("station");snd.go();return 0}onStationChange&&onStationChange(si+1);setTl(dur);setSt("station");snd.go();return si+1});return s}return s});return 0})},[n,dur,rest,rounds]);
+      useEffect(()=>{if(st!=="idle"&&st!=="done"){clearInterval(iv.current);iv.current=setInterval(()=>doT(),1000)}return()=>clearInterval(iv.current)},[doT,st]);
+      const fmt=s=>String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0");
+      const td=st==="station"?dur:rest;const pct=td>0?((td-tl)/td)*100:0;const cur=stations[idx];const nxt=stations[(idx+1)%n];
+      if(n===0)return null;
+      return(<div style={{background:BH.white,borderRadius:16,padding:24,boxShadow:"0 2px 12px rgba(0,0,0,0.08)",textAlign:"center"}}>
+        {st==="idle"&&<div><div style={{fontSize:16,color:BH.g500,marginBottom:8}}>Ready to start</div><div style={{fontSize:14,color:BH.g400}}>{n} stations &middot; {dur}s / {rest}s rest &middot; {rounds} rds</div></div>}
+        {st==="done"&&<div><div style={{fontSize:28,fontWeight:800,color:BH.gold}}>COMPLETE!</div><div style={{fontSize:14,color:BH.g500,marginTop:4}}>All {rounds} rounds done.</div></div>}
+        {(st==="station"||st==="rest")&&<div>
+          <div style={{display:"inline-block",padding:"4px 14px",borderRadius:20,fontSize:12,fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:8,background:st==="rest"?BH.g200:BH.navy,color:st==="rest"?BH.g700:BH.white}}>{st==="rest"?"Rest":"Station "+(idx+1)}</div>
+          <div style={{fontSize:22,fontWeight:800,color:BH.navy,margin:"6px 0"}}>{st==="rest"?"Get Ready...":cur.name}</div>
+          <div style={{fontSize:52,fontWeight:800,color:tl<=5?BH.shotRed:BH.navy,fontVariantNumeric:"tabular-nums",lineHeight:1.1}}>{fmt(tl)}</div>
+          <div style={{margin:"12px auto",width:"80%",height:8,background:BH.g200,borderRadius:4,overflow:"hidden"}}><div style={{height:"100%",width:pct+"%",background:st==="rest"?BH.g400:BH.gold,borderRadius:4,transition:"width 0.3s"}}/></div>
+          <div style={{fontSize:13,color:BH.g500}}>{"Round "+rnd+" of "+rounds}{st==="station"&&(" · Next: "+(idx+1<n?nxt.name:"End of round"))}</div>
+        </div>}
+        <div style={{display:"flex",gap:10,justifyContent:"center",marginTop:16}}>
+          {(st==="idle"||st==="done")?<button onClick={doS} style={{padding:"12px 32px",borderRadius:10,border:"none",cursor:"pointer",background:BH.navy,color:BH.white,fontSize:16,fontWeight:700}}>{st==="done"?"Restart":"Start Timer"}</button>
+          :<React.Fragment><button onClick={doP} style={{padding:"10px 24px",borderRadius:10,border:"2px solid "+BH.navy,cursor:"pointer",background:BH.white,color:BH.navy,fontSize:14,fontWeight:700}}>Pause</button>
+            <button onClick={()=>{clearInterval(iv.current);doS()}} style={{padding:"10px 24px",borderRadius:10,border:"none",cursor:"pointer",background:BH.navy,color:BH.white,fontSize:14,fontWeight:700}}>Resume</button>
+            <button onClick={doR} style={{padding:"10px 24px",borderRadius:10,border:"2px solid "+BH.g300,cursor:"pointer",background:BH.white,color:BH.g500,fontSize:14,fontWeight:600}}>Reset</button></React.Fragment>}
         </div>
-      );
+      </div>);
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    //  STATION DETAIL
-    // ═══════════════════════════════════════════════════════════════
-    function StationDetail({ station, onClose }) {
-      if (!station) return null;
-      return (
-        <div style={{
-          background: BH.white, borderRadius: 14, padding: 20, boxShadow: "0 4px 20px rgba(0,0,0,0.12)",
-          border: "2px solid " + BH.gold, maxWidth: 400, position: "relative",
-        }}>
-          <button onClick={onClose} style={{
-            position: "absolute", top: 10, right: 14, background: "none", border: "none",
-            fontSize: 20, cursor: "pointer", color: BH.g400, fontWeight: 700,
-          }}>x</button>
-          <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: BH.gold, marginBottom: 4 }}>{station.focus}</div>
-          <h3 style={{ margin: "0 0 8px", fontSize: 20, fontWeight: 800, color: BH.navy }}>{station.name}</h3>
-          <p style={{ margin: "0 0 12px", fontSize: 14, color: BH.g700, lineHeight: 1.6 }}>{station.desc}</p>
-          <div style={{ display: "flex", gap: 16 }}>
-            <div style={{ background: BH.g100, borderRadius: 8, padding: "8px 14px" }}>
-              <div style={{ fontSize: 11, color: BH.g500, fontWeight: 600 }}>REPS / DURATION</div>
-              <div style={{ fontSize: 15, fontWeight: 700, color: BH.navy }}>{station.reps}</div>
-            </div>
-            <div style={{ background: BH.g100, borderRadius: 8, padding: "8px 14px" }}>
-              <div style={{ fontSize: 11, color: BH.g500, fontWeight: 600 }}>EQUIPMENT</div>
-              <div style={{ fontSize: 15, fontWeight: 700, color: BH.navy }}>{station.equip}</div>
-            </div>
-          </div>
+    // ═══════════ STATION DETAIL ═══════════
+    function StationDetail({station,onClose}) {
+      if(!station)return null;
+      return(<div style={{background:BH.white,borderRadius:14,padding:20,boxShadow:"0 4px 20px rgba(0,0,0,0.12)",border:"2px solid "+BH.gold,maxWidth:400,position:"relative"}}>
+        <button onClick={onClose} style={{position:"absolute",top:10,right:14,background:"none",border:"none",fontSize:20,cursor:"pointer",color:BH.g400,fontWeight:700}}>×</button>
+        <div style={{fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:1,color:BH.gold,marginBottom:4}}>{station.cat}</div>
+        <h3 style={{margin:"0 0 8px",fontSize:20,fontWeight:800,color:BH.navy}}>{station.name}</h3>
+        <p style={{margin:"0 0 12px",fontSize:14,color:BH.g700,lineHeight:1.6}}>{station.desc}</p>
+        <div style={{display:"flex",gap:16}}>
+          <div style={{background:BH.g100,borderRadius:8,padding:"8px 14px"}}><div style={{fontSize:11,color:BH.g500,fontWeight:600}}>REPS</div><div style={{fontSize:15,fontWeight:700,color:BH.navy}}>{station.reps}</div></div>
+          <div style={{background:BH.g100,borderRadius:8,padding:"8px 14px"}}><div style={{fontSize:11,color:BH.g500,fontWeight:600}}>EQUIPMENT</div><div style={{fontSize:15,fontWeight:700,color:BH.navy}}>{station.equip}</div></div>
         </div>
-      );
+      </div>);
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    //  MAIN APP
-    // ═══════════════════════════════════════════════════════════════
+    // ═══════════ MAIN APP ═══════════
     function App() {
-      const [tab, setTab] = useState("drills");
-      const [plan, setPlan] = useState(new Set());
-      const [viewDrill, setViewDrill] = useState(null);
-      const [practiceMode, setPracticeMode] = useState(false);
-      const [practiceIdx, setPracticeIdx] = useState(0);
-      const [circuitId, setCircuitId] = useState(CIRCUITS[0].id);
-      const [selStation, setSelStation] = useState(null);
-      const [timerStation, setTimerStation] = useState(-1);
+      const [tab,setTab]=useState("drills");
+      const [plan,setPlan]=useState(new Set());const [viewDrill,setViewDrill]=useState(null);const [practiceMode,setPracticeMode]=useState(false);const [practiceIdx,setPracticeIdx]=useState(0);
+      const [selEx,setSelEx]=useState([]);const [catF,setCatF]=useState("All");const [selSt,setSelSt]=useState(null);const [timerSt,setTimerSt]=useState(-1);
+      const [cDur,setCDur]=useState(45);const [cRest,setCRest]=useState(15);const [cRounds,setCRounds]=useState(3);
+      const singles=DRILLS.filter(d=>d.cat==="singles");const doubles=DRILLS.filter(d=>d.cat==="doubles");
+      const planD=DRILLS.filter(d=>plan.has(d.id));const toggleP=id=>setPlan(p=>{const n=new Set(p);n.has(id)?n.delete(id):n.add(id);return n});
+      const pDrill=practiceMode&&planD.length>0?planD[practiceIdx%planD.length]:null;
+      const filtered=catF==="All"?EXERCISES:EXERCISES.filter(e=>e.cat===catF);
+      const toggleEx=ex=>setSelEx(prev=>prev.find(e=>e.id===ex.id)?prev.filter(e=>e.id!==ex.id):[...prev,ex]);
+      const DrillRow=({drill,inPlan,active,onToggle,onView})=>(<div style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderRadius:8,marginBottom:4,background:active?"rgba(27,54,93,0.07)":"transparent",cursor:"pointer"}} onClick={onView}>
+        <div onClick={e=>{e.stopPropagation();onToggle()}} style={{width:22,height:22,borderRadius:6,border:"2px solid "+(inPlan?BH.gold:BH.g300),background:inPlan?BH.gold:BH.white,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0}}>
+          {inPlan&&<span style={{color:BH.white,fontSize:14,fontWeight:700,lineHeight:1}}>✓</span>}</div>
+        <div style={{flex:1}}><div style={{fontSize:14,fontWeight:600,color:BH.navy}}>{drill.name}</div><div style={{fontSize:11,color:BH.g400}}>{drill.diff}</div></div></div>);
+      const NumIn=({label,value,onChange,min,max})=>(<div style={{display:"flex",alignItems:"center",gap:6}}>
+        <span style={{fontSize:12,color:BH.g500,fontWeight:600}}>{label}</span>
+        <input type="number" value={value} min={min} max={max} onChange={e=>onChange(Math.max(min,Math.min(max,parseInt(e.target.value)||min)))}
+          style={{width:52,padding:"4px 6px",borderRadius:6,border:"1px solid "+BH.g300,fontSize:14,fontWeight:700,color:BH.navy,textAlign:"center"}}/></div>);
 
-      const circuit = CIRCUITS.find((c) => c.id === circuitId);
-      const singles = DRILLS.filter((d) => d.cat === "singles");
-      const doubles = DRILLS.filter((d) => d.cat === "doubles");
-      const planDrills = DRILLS.filter((d) => plan.has(d.id));
-
-      const togglePlan = (id) => setPlan((prev) => {
-        const next = new Set(prev);
-        next.has(id) ? next.delete(id) : next.add(id);
-        return next;
-      });
-
-      const practiceDrill = practiceMode && planDrills.length > 0 ? planDrills[practiceIdx % planDrills.length] : null;
-
-      const DrillRow = ({ drill, inPlan, active, onToggle, onView }) => (
-        <div style={{
-          display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 8, marginBottom: 4,
-          background: active ? "rgba(27,54,93,0.07)" : "transparent", cursor: "pointer", transition: "background 0.15s",
-        }} onClick={onView}>
-          <div onClick={(e) => { e.stopPropagation(); onToggle(); }} style={{
-            width: 22, height: 22, borderRadius: 6, border: "2px solid " + (inPlan ? BH.gold : BH.g300),
-            background: inPlan ? BH.gold : BH.white, display: "flex", alignItems: "center", justifyContent: "center",
-            cursor: "pointer", flexShrink: 0, transition: "all 0.15s",
-          }}>
-            {inPlan && <span style={{ color: BH.white, fontSize: 14, fontWeight: 700, lineHeight: 1 }}>✓</span>}
+      return(<div style={{fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif',background:BH.offWhite,minHeight:"100vh",color:BH.g800}}>
+        <div style={{background:"linear-gradient(135deg,"+BH.navy+","+BH.navyDark+")",padding:"16px 24px 0",color:BH.white}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+            <div><div style={{fontSize:13,fontWeight:700,letterSpacing:2,textTransform:"uppercase",color:BH.gold}}>Belmont Hill</div>
+              <div style={{fontSize:22,fontWeight:800,marginTop:2}}>Varsity Tennis Training</div></div>
+            {tab==="drills"&&plan.size>0&&<button onClick={()=>{setPracticeMode(!practiceMode);setPracticeIdx(0)}} style={{padding:"8px 18px",borderRadius:8,border:"none",cursor:"pointer",background:practiceMode?BH.gold:"rgba(255,255,255,0.15)",color:practiceMode?BH.navyDark:BH.white,fontSize:13,fontWeight:700}}>{practiceMode?"Exit Practice":"Practice Mode ("+plan.size+")"}</button>}
           </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: BH.navy }}>{drill.name}</div>
-            <div style={{ fontSize: 11, color: BH.g400 }}>{drill.diff}</div>
-          </div>
+          <div style={{display:"flex"}}>{["drills","circuits"].map(t=>(<button key={t} onClick={()=>{setTab(t);setPracticeMode(false)}} style={{padding:"10px 28px",border:"none",cursor:"pointer",background:tab===t?BH.white:"transparent",color:tab===t?BH.navy:"rgba(255,255,255,0.7)",fontSize:14,fontWeight:700,borderRadius:"8px 8px 0 0",textTransform:"uppercase",letterSpacing:.5}}>{t}</button>))}</div>
         </div>
-      );
 
-      return (
-        <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', background: BH.offWhite, minHeight: "100vh", color: BH.g800 }}>
-          {/* Header */}
-          <div style={{ background: "linear-gradient(135deg, " + BH.navy + ", " + BH.navyDark + ")", padding: "16px 24px 0", color: BH.white }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: BH.gold }}>Belmont Hill</div>
-                <div style={{ fontSize: 22, fontWeight: 800, marginTop: 2 }}>Varsity Tennis Training</div>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                {tab === "drills" && plan.size > 0 && (
-                  <button onClick={() => { setPracticeMode(!practiceMode); setPracticeIdx(0); }} style={{
-                    padding: "8px 18px", borderRadius: 8, border: "none", cursor: "pointer",
-                    background: practiceMode ? BH.gold : "rgba(255,255,255,0.15)",
-                    color: practiceMode ? BH.navyDark : BH.white, fontSize: 13, fontWeight: 700,
-                  }}>{practiceMode ? "Exit Practice" : "Practice Mode (" + plan.size + ")"}</button>
-                )}
-              </div>
+        {tab==="drills"&&(practiceMode&&pDrill?
+          <div style={{padding:24,maxWidth:900,margin:"0 auto"}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
+              <button onClick={()=>setPracticeIdx(Math.max(0,practiceIdx-1))} disabled={practiceIdx===0} style={{padding:"10px 20px",borderRadius:8,border:"2px solid "+BH.navy,background:BH.white,color:BH.navy,fontSize:14,fontWeight:700,cursor:practiceIdx===0?"default":"pointer",opacity:practiceIdx===0?0.3:1}}>Previous</button>
+              <div style={{fontSize:14,fontWeight:600,color:BH.g500}}>{"Drill "+(practiceIdx+1)+" of "+planD.length}</div>
+              <button onClick={()=>setPracticeIdx(Math.min(planD.length-1,practiceIdx+1))} disabled={practiceIdx>=planD.length-1} style={{padding:"10px 20px",borderRadius:8,border:"none",background:BH.navy,color:BH.white,fontSize:14,fontWeight:700,cursor:practiceIdx>=planD.length-1?"default":"pointer",opacity:practiceIdx>=planD.length-1?0.3:1}}>Next Drill</button>
+            </div><DrillViewer drill={pDrill}/></div>
+          :<div style={{display:"flex",minHeight:"calc(100vh - 110px)"}}>
+            <div style={{width:280,borderRight:"1px solid "+BH.g200,overflowY:"auto",padding:16,flexShrink:0}}>
+              <div style={{fontSize:12,fontWeight:700,textTransform:"uppercase",letterSpacing:1,color:BH.g500,marginBottom:10}}>Singles</div>
+              {singles.map(d=><DrillRow key={d.id} drill={d} inPlan={plan.has(d.id)} active={viewDrill&&viewDrill.id===d.id} onToggle={()=>toggleP(d.id)} onView={()=>setViewDrill(d)}/>)}
+              <div style={{fontSize:12,fontWeight:700,textTransform:"uppercase",letterSpacing:1,color:BH.g500,margin:"16px 0 10px"}}>Doubles</div>
+              {doubles.map(d=><DrillRow key={d.id} drill={d} inPlan={plan.has(d.id)} active={viewDrill&&viewDrill.id===d.id} onToggle={()=>toggleP(d.id)} onView={()=>setViewDrill(d)}/>)}
+              {plan.size>0&&<div style={{marginTop:20,padding:12,background:"rgba(27,54,93,0.06)",borderRadius:10}}>
+                <div style={{fontSize:12,fontWeight:700,color:BH.navy,marginBottom:8,textTransform:"uppercase"}}>{"Today's Plan ("+plan.size+")"}</div>
+                {planD.map((d,i)=><div key={d.id} style={{fontSize:13,color:BH.g700,marginBottom:4,cursor:"pointer"}} onClick={()=>setViewDrill(d)}><span style={{color:BH.gold,fontWeight:700,marginRight:6}}>{i+1+"."}</span>{d.name}</div>)}
+              </div>}
             </div>
-            <div style={{ display: "flex", gap: 0 }}>
-              {["drills", "circuits"].map((t) => (
-                <button key={t} onClick={() => { setTab(t); setPracticeMode(false); }} style={{
-                  padding: "10px 28px", border: "none", cursor: "pointer",
-                  background: tab === t ? BH.white : "transparent",
-                  color: tab === t ? BH.navy : "rgba(255,255,255,0.7)",
-                  fontSize: 14, fontWeight: 700, borderRadius: "8px 8px 0 0",
-                  textTransform: "uppercase", letterSpacing: 0.5,
-                }}>{t}</button>
-              ))}
+            <div style={{flex:1,padding:24,overflowY:"auto"}}><DrillViewer drill={viewDrill}/></div>
+          </div>)}
+
+        {tab==="circuits"&&<div style={{display:"flex",minHeight:"calc(100vh - 110px)"}}>
+          <div style={{width:320,borderRight:"1px solid "+BH.g200,overflowY:"auto",padding:16,flexShrink:0}}>
+            <div style={{fontSize:12,fontWeight:700,textTransform:"uppercase",letterSpacing:1,color:BH.g500,marginBottom:10}}>Exercise Library</div>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12}}>{EX_CATS.map(cat=>(<button key={cat} onClick={()=>setCatF(cat)} style={{padding:"5px 12px",borderRadius:20,border:"none",cursor:"pointer",background:catF===cat?BH.navy:BH.g100,color:catF===cat?BH.white:BH.g700,fontSize:11,fontWeight:700}}>{cat}</button>))}</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+              {filtered.map(ex=>{const sel=selEx.find(e=>e.id===ex.id);
+                return(<div key={ex.id} onClick={()=>toggleEx(ex)} style={{padding:"10px",borderRadius:8,cursor:"pointer",border:"2px solid "+(sel?BH.gold:BH.g200),background:sel?"rgba(201,162,39,0.08)":BH.white,transition:"all 0.15s"}}>
+                  <div style={{fontSize:12,fontWeight:600,color:BH.navy}}>{ex.name}</div>
+                  <div style={{fontSize:10,color:BH.g400,marginTop:2}}>{ex.cat} · {ex.reps}</div></div>)})}
+            </div>
+            {selEx.length>0&&<div style={{marginTop:16,padding:12,background:"rgba(27,54,93,0.06)",borderRadius:10}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                <div style={{fontSize:12,fontWeight:700,color:BH.navy,textTransform:"uppercase"}}>{"Selected ("+selEx.length+")"}</div>
+                <button onClick={()=>setSelEx([])} style={{fontSize:11,color:BH.shotRed,background:"none",border:"none",cursor:"pointer",fontWeight:600}}>Clear All</button></div>
+              {selEx.map((ex,i)=>(<div key={ex.id} style={{fontSize:12,color:BH.g700,marginBottom:3,display:"flex",alignItems:"center",gap:6}}>
+                <span style={{color:BH.gold,fontWeight:700,width:16}}>{i+1+"."}</span><span style={{flex:1}}>{ex.name}</span>
+                <button onClick={e=>{e.stopPropagation();toggleEx(ex)}} style={{background:"none",border:"none",cursor:"pointer",color:BH.g400,fontSize:14,fontWeight:700,padding:"0 4px"}}>×</button></div>))}
+            </div>}
+          </div>
+          <div style={{flex:1,padding:24,overflowY:"auto"}}>
+            <div style={{display:"flex",gap:20,marginBottom:20,flexWrap:"wrap",alignItems:"center"}}>
+              <NumIn label="Work (s)" value={cDur} onChange={setCDur} min={10} max={120}/>
+              <NumIn label="Rest (s)" value={cRest} onChange={setCRest} min={5} max={60}/>
+              <NumIn label="Rounds" value={cRounds} onChange={setCRounds} min={1} max={10}/>
+            </div>
+            <div style={{display:"flex",gap:24,flexWrap:"wrap",alignItems:"flex-start"}}>
+              <div style={{flex:"0 0 auto"}}><CircuitRing stations={selEx} activeIdx={selSt} timerIdx={timerSt} onSelect={i=>setSelSt(selSt===i?null:i)}/></div>
+              <div style={{flex:1,minWidth:300,display:"flex",flexDirection:"column",gap:20}}>
+                {selSt!==null&&selEx[selSt]&&<StationDetail station={selEx[selSt]} onClose={()=>setSelSt(null)}/>}
+                {selEx.length>0&&<CircuitTimer stations={selEx} dur={cDur} rest={cRest} rounds={cRounds} onStationChange={setTimerSt}/>}
+              </div>
             </div>
           </div>
-
-          {/* Drills Tab */}
-          {tab === "drills" && (
-            practiceMode && practiceDrill ? (
-              <div style={{ padding: 24, maxWidth: 900, margin: "0 auto" }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-                  <button onClick={() => setPracticeIdx(Math.max(0, practiceIdx - 1))} disabled={practiceIdx === 0}
-                    style={{ padding: "10px 20px", borderRadius: 8, border: "2px solid " + BH.navy, background: BH.white, color: BH.navy, fontSize: 14, fontWeight: 700, cursor: practiceIdx === 0 ? "default" : "pointer", opacity: practiceIdx === 0 ? 0.3 : 1 }}>
-                    Previous</button>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: BH.g500 }}>
-                    {"Drill " + (practiceIdx + 1) + " of " + planDrills.length}</div>
-                  <button onClick={() => setPracticeIdx(Math.min(planDrills.length - 1, practiceIdx + 1))} disabled={practiceIdx >= planDrills.length - 1}
-                    style={{ padding: "10px 20px", borderRadius: 8, border: "none", background: BH.navy, color: BH.white, fontSize: 14, fontWeight: 700, cursor: practiceIdx >= planDrills.length - 1 ? "default" : "pointer", opacity: practiceIdx >= planDrills.length - 1 ? 0.3 : 1 }}>
-                    Next Drill</button>
-                </div>
-                <DrillViewer drill={practiceDrill} />
-              </div>
-            ) : (
-              <div style={{ display: "flex", minHeight: "calc(100vh - 110px)" }}>
-                <div style={{ width: 280, borderRight: "1px solid " + BH.g200, overflowY: "auto", padding: 16, flexShrink: 0 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: BH.g500, marginBottom: 10 }}>Singles Drills</div>
-                  {singles.map((d) => (
-                    <DrillRow key={d.id} drill={d} inPlan={plan.has(d.id)} active={viewDrill && viewDrill.id === d.id}
-                      onToggle={() => togglePlan(d.id)} onView={() => setViewDrill(d)} />
-                  ))}
-                  <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: BH.g500, margin: "16px 0 10px" }}>Doubles Drills</div>
-                  {doubles.map((d) => (
-                    <DrillRow key={d.id} drill={d} inPlan={plan.has(d.id)} active={viewDrill && viewDrill.id === d.id}
-                      onToggle={() => togglePlan(d.id)} onView={() => setViewDrill(d)} />
-                  ))}
-                  {plan.size > 0 && (
-                    <div style={{ marginTop: 20, padding: 12, background: "rgba(27,54,93,0.06)", borderRadius: 10 }}>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: BH.navy, marginBottom: 8, textTransform: "uppercase" }}>
-                        {"Today's Plan (" + plan.size + ")"}</div>
-                      {planDrills.map((d, i) => (
-                        <div key={d.id} style={{ fontSize: 13, color: BH.g700, marginBottom: 4, cursor: "pointer" }}
-                          onClick={() => setViewDrill(d)}>
-                          <span style={{ color: BH.gold, fontWeight: 700, marginRight: 6 }}>{(i + 1) + "."}</span>{d.name}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <div style={{ flex: 1, padding: 24, overflowY: "auto" }}>
-                  <DrillViewer drill={viewDrill} />
-                </div>
-              </div>
-            )
-          )}
-
-          {/* Circuits Tab */}
-          {tab === "circuits" && (
-            <div style={{ padding: 24, maxWidth: 900, margin: "0 auto" }}>
-              <div style={{ display: "flex", gap: 10, marginBottom: 24 }}>
-                {CIRCUITS.map((c) => (
-                  <button key={c.id} onClick={() => { setCircuitId(c.id); setSelStation(null); setTimerStation(-1); }} style={{
-                    padding: "10px 22px", borderRadius: 10, border: "2px solid " + (circuitId === c.id ? BH.navy : BH.g300),
-                    background: circuitId === c.id ? BH.navy : BH.white,
-                    color: circuitId === c.id ? BH.white : BH.g700,
-                    fontSize: 14, fontWeight: 700, cursor: "pointer",
-                  }}>{c.name}</button>
-                ))}
-              </div>
-              <div style={{ display: "flex", gap: 24, flexWrap: "wrap", alignItems: "flex-start" }}>
-                <div style={{ flex: "0 0 auto" }}>
-                  <CircuitRing stations={circuit.stations} activeIdx={selStation} timerIdx={timerStation}
-                    onSelect={(i) => setSelStation(selStation === i ? null : i)} />
-                  <div style={{ textAlign: "center", fontSize: 12, color: BH.g400, marginTop: 4 }}>Tap a station for details</div>
-                </div>
-                <div style={{ flex: 1, minWidth: 300, display: "flex", flexDirection: "column", gap: 20 }}>
-                  {selStation !== null && (
-                    <StationDetail station={circuit.stations[selStation]} onClose={() => setSelStation(null)} />
-                  )}
-                  <CircuitTimer circuit={circuit} onStationChange={setTimerStation} />
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      );
+        </div>}
+      </div>);
     }
 
-    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+    ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
   </script>
 </body>
 </html>
