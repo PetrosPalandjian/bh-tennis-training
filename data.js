@@ -67,9 +67,9 @@ const EX_CATS=["All",...Array.from(new Set(EXERCISES.map(e=>e.cat)))];
 const DRILLS=[
   {
     id:"cc-fh",name:"Crosscourt Forehand",cat:"Groundstrokes",diff:"Beginner",
-    desc:"Rally crosscourt FH from deuce side",
-    tips:["Keep a high net clearance","Follow through across body","Small split step between shots"],
-    youtubeId:null,courtType:"singles",
+    desc:"Rally crosscourt FH from deuce side. Both players start on the deuce (right) side of the baseline. Hit forehands diagonally crosscourt to each other, aiming deep into the service box corner. Focus on consistent topspin, high net clearance, and recovering to center after each shot.",
+    tips:["Keep a high net clearance — aim 3-5 feet over the net","Follow through across your body for natural topspin","Small split step between shots to stay balanced","Turn sideways before contact and rotate through the core","Use targets or cones in the crosscourt zone to build accuracy"],
+    youtubeId:"UwIPqGkQO80",youtubeStart:80,youtubeEnd:150,courtType:"singles",
     players:[{id:"A",x:72,y:92,color:BH.shotBlue},{id:"B",x:28,y:8,color:BH.shotRed}],
     steps:[
       {t:"hit",f:[72,92],to:[28,8],c:BH.shotBlue,n:"1",shot:"forehand",hitter:"A"},
