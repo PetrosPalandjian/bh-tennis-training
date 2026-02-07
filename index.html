@@ -1244,9 +1244,16 @@ function LoginModal({onLogin, onClose}) {
 function App() {
   const SUPABASE_URL = "https://uievqtckkotplvyfqshu.supabase.co";
   const SUPABASE_ANON_KEY = "sb_publishable_8YcUvmNO3QWfFqOnqMKcdg_y_-L2QRg";
-  const sb = (window.supabase && window.supabase.createClient)
-    ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
-    : null;
+  const sbRest = async (path, opts = {}) => {
+    const headers = Object.assign({
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      "Content-Type": "application/json",
+      Accept: "application/json"
+    }, opts.headers || {});
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, Object.assign({}, opts, { headers }));
+    return res;
+  };
 
   const [tab, setTab] = React.useState("circuits");
   const [admin, setAdmin] = React.useState(false);
@@ -1290,10 +1297,11 @@ function App() {
       setRounds(c.rounds || 3);
     };
     const loadFromSupabase = async () => {
-      if (!sb) return null;
-      const { data, error } = await sb.from("published_plan").select("data").eq("id", 1).single();
-      if (error) return null;
-      return data && data.data ? data.data : null;
+      const res = await sbRest("published_plan?select=data&id=eq.1", { method: "GET" });
+      if (!res.ok) return null;
+      const rows = await res.json();
+      if (!rows || !rows[0] || !rows[0].data) return null;
+      return rows[0].data;
     };
     if (cfg) {
       applyCfg(cfg);
@@ -1330,22 +1338,22 @@ function App() {
         setTimeout(() => setToast(""), 3000);
       });
     };
-    if (sb) {
-      sb.from("published_plan").upsert({ id: 1, data: cfg }).then(({ error }) => {
-        if (error) {
-          doLocalPublish();
-          setToast("Published locally. Supabase write failed.");
-          setTimeout(() => setToast(""), 4000);
-          return;
-        }
-        setPubDrills(selDrills);
-        setPubExercises(selExercises);
-        setToast("Plan published for everyone!");
-        setTimeout(() => setToast(""), 3000);
-      });
-    } else {
-      doLocalPublish();
-    }
+    sbRest("published_plan", {
+      method: "POST",
+      headers: { Prefer: "resolution=merge-duplicates" },
+      body: JSON.stringify({ id: 1, data: cfg })
+    }).then(async (res) => {
+      if (!res.ok) {
+        doLocalPublish();
+        setToast("Published locally. Supabase write failed.");
+        setTimeout(() => setToast(""), 4000);
+        return;
+      }
+      setPubDrills(selDrills);
+      setPubExercises(selExercises);
+      setToast("Plan published for everyone!");
+      setTimeout(() => setToast(""), 3000);
+    });
   };
 
   // Toggle drill selection (admin)
