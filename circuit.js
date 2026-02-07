@@ -4,14 +4,15 @@
  *
  * Components:
  * - CircuitRing: Circular station layout
- * - CircuitTimer: Countdown timer with state machine
+ * - CircuitTimer: Compact horizontal countdown timer with state machine
  */
 
 /**
  * CircuitRing Component
  * Renders stations in a circle with dynamic sizing based on number of stations
+ * All stations are same color (navy). Selected station gets subtle highlight.
  */
-function CircuitRing({stations, activeIdx, timerIdx, onSelect}) {
+function CircuitRing({stations, selectedIdx, onSelect}) {
   const n = stations.length;
   if (n === 0) return (
     <div style={{textAlign:"center", padding:"60px 20px", color:BH.g500, fontSize:"15px"}}>
@@ -19,10 +20,27 @@ function CircuitRing({stations, activeIdx, timerIdx, onSelect}) {
     </div>
   );
 
-  const size = 320, cx = size/2, cy = size/2;
-  const rad = Math.min(120, Math.max(80, 140 - n*4));
-  const nr = Math.min(38, Math.max(24, 44 - n*2));
-  const fs = Math.min(10, Math.max(7, 11 - n*0.3));
+  const size = 520, cx = size/2, cy = size/2;
+  const rad = 200;
+  const nr = 48;
+  const fs = 11;
+
+  // Helper to wrap text into multiple lines
+  function wrapText(text, maxLen) {
+    const words = text.split(" ");
+    const lines = [];
+    let currentLine = "";
+    for (const word of words) {
+      if ((currentLine + " " + word).trim().length <= maxLen) {
+        currentLine = currentLine ? currentLine + " " + word : word;
+      } else {
+        if (currentLine) lines.push(currentLine);
+        currentLine = word;
+      }
+    }
+    if (currentLine) lines.push(currentLine);
+    return lines;
+  }
 
   return (
     <svg width={size} height={size} style={{display:"block", margin:"0 auto"}}>
@@ -30,34 +48,69 @@ function CircuitRing({stations, activeIdx, timerIdx, onSelect}) {
       <circle cx={cx} cy={cy} r={rad} fill="none" stroke={BH.g300} strokeWidth={1} strokeDasharray="4,3"/>
 
       {/* Center label */}
-      <text x={cx} y={cy-6} textAnchor="middle" fontSize="11" fontWeight="bold" fill={BH.navy}>CIRCUIT</text>
-      <text x={cx} y={cy+8} textAnchor="middle" fontSize="9" fill={BH.g500}>{n} stations</text>
+      <text x={cx} y={cy-6} textAnchor="middle" fontSize="13" fontWeight="bold" fill={BH.navy}>CIRCUIT</text>
+      <text x={cx} y={cy+10} textAnchor="middle" fontSize="11" fill={BH.g500}>{n} stations</text>
 
       {/* Station nodes */}
       {stations.map((s, i) => {
         const ang = (i / n) * Math.PI * 2 - Math.PI / 2;
         const x = cx + rad * Math.cos(ang);
         const y = cy + rad * Math.sin(ang);
-        const isActive = i === activeIdx;
-        const isTimer = i === timerIdx;
-        const fillCol = isTimer ? BH.shotGold : isActive ? BH.gold : BH.navy;
-        const strokeCol = isTimer ? BH.shotRed : isActive ? BH.navy : BH.g400;
-        const strokeW = isActive || isTimer ? 3 : 1.5;
-        const scale = isActive ? 1.1 : 1;
+        const isSelected = i === selectedIdx;
 
-        // Truncate name to fit
-        const displayName = s.name.length > 12 ? s.name.substring(0, 11) + "…" : s.name;
+        // All stations are navy, selected gets gold border
+        const fillCol = BH.navy;
+        const strokeCol = isSelected ? BH.gold : BH.g400;
+        const strokeW = isSelected ? 3 : 1.5;
+
+        // Wrap exercise name
+        const lines = wrapText(s.name, 10);
+        const stationNum = String(i + 1);
 
         return (
           <g key={s.id} style={{cursor: onSelect ? "pointer" : "default"}}
-             onClick={() => onSelect && onSelect(i)}
-             transform={`translate(${x},${y}) scale(${scale})`}>
-            <circle cx={0} cy={0} r={nr} fill={fillCol} stroke={strokeCol} strokeWidth={strokeW}/>
-            <text x={0} y={-2} textAnchor="middle" dominantBaseline="middle"
-                  fontSize={fs} fontWeight="bold" fill={BH.white}
-                  style={{pointerEvents:"none"}}>{displayName}</text>
-            <text x={0} y={nr*0.45} textAnchor="middle" fontSize={Math.max(6, fs-2)}
-                  fill="rgba(255,255,255,0.7)" style={{pointerEvents:"none"}}>{s.reps || ""}</text>
+             onClick={() => onSelect && onSelect(i)}>
+            <circle cx={x} cy={y} r={nr} fill={fillCol} stroke={strokeCol} strokeWidth={strokeW}/>
+
+            {/* Station number above */}
+            <text x={x} y={y - nr - 8} textAnchor="middle" fontSize="12" fontWeight="bold"
+                  fill={BH.navy} style={{pointerEvents:"none"}}>
+              {stationNum}
+            </text>
+
+            {/* Exercise name, wrapped */}
+            {lines.length === 1 && (
+              <text x={x} y={y + 2} textAnchor="middle" dominantBaseline="middle"
+                    fontSize={fs} fontWeight="bold" fill={BH.white}
+                    style={{pointerEvents:"none"}}>{lines[0]}</text>
+            )}
+            {lines.length === 2 && (
+              <>
+                <text x={x} y={y - 4} textAnchor="middle" dominantBaseline="middle"
+                      fontSize={fs} fontWeight="bold" fill={BH.white}
+                      style={{pointerEvents:"none"}}>{lines[0]}</text>
+                <text x={x} y={y + 8} textAnchor="middle" dominantBaseline="middle"
+                      fontSize={fs} fontWeight="bold" fill={BH.white}
+                      style={{pointerEvents:"none"}}>{lines[1]}</text>
+              </>
+            )}
+            {lines.length >= 3 && (
+              <>
+                <text x={x} y={y - 8} textAnchor="middle" dominantBaseline="middle"
+                      fontSize={fs} fontWeight="bold" fill={BH.white}
+                      style={{pointerEvents:"none"}}>{lines[0]}</text>
+                <text x={x} y={y + 2} textAnchor="middle" dominantBaseline="middle"
+                      fontSize={fs} fontWeight="bold" fill={BH.white}
+                      style={{pointerEvents:"none"}}>{lines[1]}</text>
+                <text x={x} y={y + 12} textAnchor="middle" dominantBaseline="middle"
+                      fontSize={fs} fontWeight="bold" fill={BH.white}
+                      style={{pointerEvents:"none"}}>{lines[2]}</text>
+              </>
+            )}
+
+            {/* Reps/sets info below */}
+            <text x={x} y={y + nr + 12} textAnchor="middle" fontSize="9"
+                  fill={BH.g500} style={{pointerEvents:"none"}}>{s.reps || ""}</text>
           </g>
         );
       })}
@@ -67,10 +120,11 @@ function CircuitRing({stations, activeIdx, timerIdx, onSelect}) {
 
 /**
  * CircuitTimer Component
- * Countdown timer with state machine for circuit training
+ * Compact horizontal countdown timer with state machine for circuit training
  * States: idle → station → rest → (loop) or done
+ * Renders as a compact toolbar-style timer bar (~70px height)
  */
-function CircuitTimer({work, rest, rounds, exercises, onStation}) {
+function CircuitTimer({work, rest, rounds, exercises, onStation, onPhaseInfo}) {
   const [phase, setPhase] = React.useState("idle");  // idle, station, rest, pausedStation, pausedRest, done
   const [time, setTime] = React.useState(0);
   const [stIdx, setStIdx] = React.useState(0);
@@ -89,6 +143,21 @@ function CircuitTimer({work, rest, rounds, exercises, onStation}) {
     setStIdx(0);
     setRound(1);
   }, [exercises.length]);
+
+  // Expose phase info to parent
+  React.useEffect(() => {
+    if (onPhaseInfo) {
+      onPhaseInfo({
+        phase,
+        time,
+        round,
+        stIdx,
+        remaining: Math.max(0, dur - time),
+        totalStations,
+        rounds
+      });
+    }
+  }, [phase, time, round, stIdx, dur, totalStations, rounds, onPhaseInfo]);
 
   const tick = React.useCallback(() => {
     setTime(t => {
@@ -183,82 +252,123 @@ function CircuitTimer({work, rest, rounds, exercises, onStation}) {
   }
 
   const remaining = Math.max(0, dur - time);
-  const pct = dur > 0 ? (time / dur) * 100 : 0;
   const isRunning = phase === "station" || phase === "rest";
   const isPaused = phase === "pausedStation" || phase === "pausedRest";
   const isWork = phase === "station" || phase === "pausedStation";
   const col = isWork ? BH.shotBlue : BH.shotGold;
-  const circumference = 2 * Math.PI * 90;
-
-  const currentEx = exercises[stIdx];
 
   return (
-    <div style={{textAlign:"center", padding:"16px 0"}}>
-      {/* Current exercise name */}
-      {currentEx && phase !== "idle" && phase !== "done" && (
-        <div style={{fontSize:"16px", fontWeight:"bold", color:BH.navy, marginBottom:"8px"}}>
-          {currentEx.name}
-        </div>
-      )}
-
-      {/* Circular progress */}
-      <div style={{position:"relative", width:"200px", height:"200px", margin:"0 auto"}}>
-        <svg width="200" height="200">
-          <circle cx="100" cy="100" r="90" fill="none" stroke={BH.g200} strokeWidth="6"/>
-          {dur > 0 && (
-            <circle cx="100" cy="100" r="90" fill="none" stroke={col} strokeWidth="6"
-              strokeDasharray={circumference}
-              strokeDashoffset={circumference * (1 - pct/100)}
-              strokeLinecap="round"
-              transform="rotate(-90 100 100)"
-              style={{transition:"stroke-dashoffset 0.3s"}}/>
-          )}
-        </svg>
-        <div style={{position:"absolute", top:"50%", left:"50%", transform:"translate(-50%,-50%)", textAlign:"center"}}>
-          {phase === "idle" ? (
-            <div style={{fontSize:"18px", fontWeight:"bold", color:BH.navy}}>READY</div>
-          ) : phase === "done" ? (
-            <div>
-              <div style={{fontSize:"18px", fontWeight:"bold", color:BH.gold}}>DONE!</div>
-              <div style={{fontSize:"11px", color:BH.g500, marginTop:"4px"}}>Great work!</div>
-            </div>
-          ) : (
-            <>
-              <div style={{fontSize:"48px", fontWeight:"bold", color:col, lineHeight:1}}>{remaining}</div>
-              <div style={{fontSize:"13px", fontWeight:"bold", color:isWork?BH.navy:BH.shotGold, marginTop:"4px"}}>
-                {isWork ? "WORK" : "REST"}
-              </div>
-              <div style={{fontSize:"11px", color:BH.g500, marginTop:"2px"}}>
-                Round {round}/{rounds} • Station {stIdx+1}/{totalStations}
-              </div>
-            </>
-          )}
-        </div>
+    <div style={{
+      display: "flex",
+      alignItems: "center",
+      gap: "16px",
+      padding: "8px 16px",
+      background: BH.g100,
+      borderRadius: "8px",
+      minHeight: "70px",
+      fontSize: "14px",
+      fontFamily: "system-ui, -apple-system, sans-serif"
+    }}>
+      {/* Countdown number - big and bold */}
+      <div style={{
+        fontSize: "42px",
+        fontWeight: "bold",
+        color: phase === "idle" ? BH.g400 : col,
+        minWidth: "80px",
+        textAlign: "center",
+        fontVariantNumeric: "tabular-nums"
+      }}>
+        {phase === "idle" ? "—" : phase === "done" ? "✓" : remaining}
       </div>
 
-      {/* Controls */}
-      <div style={{display:"flex", gap:"8px", justifyContent:"center", marginTop:"16px"}}>
+      {/* Divider */}
+      <div style={{width: "1px", height: "50px", background: BH.g300}} />
+
+      {/* Phase label and info */}
+      <div style={{flex: 1}}>
         {phase === "idle" && (
-          <button onClick={start} style={{padding:"12px 32px", background:BH.shotBlue, color:BH.white,
-            border:"none", borderRadius:"6px", cursor:"pointer", fontSize:"15px", fontWeight:"bold"}}>
+          <div style={{color: BH.g500, fontSize: "13px"}}>Ready to start</div>
+        )}
+        {phase === "done" && (
+          <div style={{fontWeight: "bold", color: BH.gold}}>CIRCUIT COMPLETE!</div>
+        )}
+        {(phase === "station" || phase === "pausedStation") && (
+          <>
+            <div style={{fontWeight: "bold", color: BH.shotBlue, marginBottom: "2px"}}>WORK</div>
+            <div style={{fontSize: "12px", color: BH.g500}}>
+              Round {round}/{rounds} • Station {stIdx + 1}/{totalStations}
+            </div>
+          </>
+        )}
+        {(phase === "rest" || phase === "pausedRest") && (
+          <>
+            <div style={{fontWeight: "bold", color: BH.shotGold, marginBottom: "2px"}}>REST</div>
+            <div style={{fontSize: "12px", color: BH.g500}}>
+              Round {round}/{rounds} • Next: Station {(stIdx + 1) % totalStations + 1}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Control buttons */}
+      <div style={{display: "flex", gap: "8px"}}>
+        {phase === "idle" && (
+          <button onClick={start} style={{
+            padding: "8px 16px",
+            background: BH.shotBlue,
+            color: BH.white,
+            border: "none",
+            borderRadius: "4px",
+            cursor: "pointer",
+            fontSize: "13px",
+            fontWeight: "bold",
+            whiteSpace: "nowrap"
+          }}>
             START
           </button>
         )}
         {isRunning && (
-          <button onClick={pause} style={{padding:"12px 24px", background:BH.shotGold, color:BH.navy,
-            border:"none", borderRadius:"6px", cursor:"pointer", fontSize:"14px", fontWeight:"bold"}}>
+          <button onClick={pause} style={{
+            padding: "8px 14px",
+            background: BH.shotGold,
+            color: BH.navy,
+            border: "none",
+            borderRadius: "4px",
+            cursor: "pointer",
+            fontSize: "13px",
+            fontWeight: "bold",
+            whiteSpace: "nowrap"
+          }}>
             PAUSE
           </button>
         )}
         {isPaused && (
-          <button onClick={resume} style={{padding:"12px 24px", background:BH.shotBlue, color:BH.white,
-            border:"none", borderRadius:"6px", cursor:"pointer", fontSize:"14px", fontWeight:"bold"}}>
+          <button onClick={resume} style={{
+            padding: "8px 14px",
+            background: BH.shotBlue,
+            color: BH.white,
+            border: "none",
+            borderRadius: "4px",
+            cursor: "pointer",
+            fontSize: "13px",
+            fontWeight: "bold",
+            whiteSpace: "nowrap"
+          }}>
             RESUME
           </button>
         )}
         {(isRunning || isPaused || phase === "done") && (
-          <button onClick={reset} style={{padding:"12px 24px", background:BH.g400, color:BH.white,
-            border:"none", borderRadius:"6px", cursor:"pointer", fontSize:"14px", fontWeight:"bold"}}>
+          <button onClick={reset} style={{
+            padding: "8px 14px",
+            background: BH.g400,
+            color: BH.white,
+            border: "none",
+            borderRadius: "4px",
+            cursor: "pointer",
+            fontSize: "13px",
+            fontWeight: "bold",
+            whiteSpace: "nowrap"
+          }}>
             RESET
           </button>
         )}

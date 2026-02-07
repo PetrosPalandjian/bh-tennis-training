@@ -85,6 +85,35 @@ function DrillViewer({drill}) {
         </button>
       </div>
 
+      {/* Step-by-step breakdown */}
+      <div style={{background:BH.white, padding:"12px 16px", borderRadius:"8px", border:`1px solid ${BH.g300}`}}>
+        <div style={{fontSize:"12px", fontWeight:"bold", color:BH.navy, marginBottom:"8px"}}>
+          Step Breakdown
+        </div>
+        {steps.map((s, i) => {
+          const isActive = i === step;
+          const isPast = i < step;
+          const desc = s.t === "hit"
+            ? `${s.hitter} hits ${(s.shot||"").replace(/_/g," ")}${s.note ? " — "+s.note : ""}`
+            : `Player moves${s.note ? " — "+s.note : " to position"}`;
+          return (
+            <div key={i} style={{
+              padding:"6px 10px", marginBottom:"2px", borderRadius:"4px", fontSize:"12px",
+              display:"flex", gap:"8px", alignItems:"center",
+              background: isActive ? BH.gold : "transparent",
+              color: isActive ? BH.navy : isPast ? BH.g400 : BH.g700,
+              fontWeight: isActive ? "bold" : "normal",
+              transition: "all 0.2s"
+            }}>
+              <span style={{minWidth:"20px", fontWeight:"bold", color: isActive ? BH.navy : BH.g400}}>
+                {s.t === "hit" ? s.n : "·"}
+              </span>
+              <span>{desc}</span>
+            </div>
+          );
+        })}
+      </div>
+
       {/* Coaching tips */}
       {drill.tips && drill.tips.length > 0 && (
         <div style={{background:BH.white, padding:"14px 16px", borderRadius:"8px", border:`1px solid ${BH.g300}`}}>
@@ -571,36 +600,52 @@ function App() {
                       )}
                     </div>
                   </div>
+
+                  {adminExercises.length > 0 && (
+                    <div style={{marginTop:"16px"}}>
+                      <CircuitTimer work={work} rest={rest} rounds={rounds} exercises={adminExercises}
+                        onStation={(i) => setCircuitStIdx(i)}/>
+                    </div>
+                  )}
                 </>
               ) : (
                 /* Non-Admin: Published circuit (read-only) */
-                <div style={{background:BH.white, borderRadius:"8px", border:`2px solid ${BH.gold}`, overflow:"hidden"}}>
-                  <div style={{padding:"12px 16px", background:BH.gold, color:BH.navy}}>
-                    <div style={{fontSize:"15px", fontWeight:"bold"}}>Today's Circuit</div>
-                    <div style={{fontSize:"11px", opacity:0.8}}>
-                      {playerExercises.length} exercises • {work}s work / {rest}s rest • {rounds} rounds
+                <>
+                  <div style={{background:BH.white, borderRadius:"8px", border:`2px solid ${BH.gold}`, overflow:"hidden"}}>
+                    <div style={{padding:"12px 16px", background:BH.gold, color:BH.navy}}>
+                      <div style={{fontSize:"15px", fontWeight:"bold"}}>Today's Circuit</div>
+                      <div style={{fontSize:"11px", opacity:0.8}}>
+                        {playerExercises.length} exercises • {work}s work / {rest}s rest • {rounds} rounds
+                      </div>
+                    </div>
+                    <div style={{padding:"8px 0"}}>
+                      {playerExercises.length === 0 ? (
+                        <div style={{padding:"20px 16px", textAlign:"center", fontSize:"13px", color:BH.g500}}>
+                          No circuit published yet. Check back later!
+                        </div>
+                      ) : (
+                        playerExercises.map((e, i) => (
+                          <div key={e.id} style={{padding:"8px 16px", display:"flex", gap:"10px", alignItems:"center",
+                            borderBottom:`1px solid ${BH.g100}`,
+                            background:circuitStIdx===i ? `rgba(201,162,39,0.12)` : "transparent"}}>
+                            <span style={{fontSize:"14px", fontWeight:"bold", color:BH.gold, minWidth:"24px"}}>{i+1}</span>
+                            <div>
+                              <div style={{fontSize:"13px", fontWeight:"bold", color:BH.navy}}>{e.name}</div>
+                              <div style={{fontSize:"11px", color:BH.g500}}>{e.reps} • {e.equip}</div>
+                            </div>
+                          </div>
+                        ))
+                      )}
                     </div>
                   </div>
-                  <div style={{padding:"8px 0"}}>
-                    {playerExercises.length === 0 ? (
-                      <div style={{padding:"20px 16px", textAlign:"center", fontSize:"13px", color:BH.g500}}>
-                        No circuit published yet. Check back later!
-                      </div>
-                    ) : (
-                      playerExercises.map((e, i) => (
-                        <div key={e.id} style={{padding:"8px 16px", display:"flex", gap:"10px", alignItems:"center",
-                          borderBottom:`1px solid ${BH.g100}`,
-                          background:circuitStIdx===i ? `rgba(201,162,39,0.12)` : "transparent"}}>
-                          <span style={{fontSize:"14px", fontWeight:"bold", color:BH.gold, minWidth:"24px"}}>{i+1}</span>
-                          <div>
-                            <div style={{fontSize:"13px", fontWeight:"bold", color:BH.navy}}>{e.name}</div>
-                            <div style={{fontSize:"11px", color:BH.g500}}>{e.reps} • {e.equip}</div>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
+
+                  {playerExercises.length > 0 && (
+                    <div style={{marginTop:"16px"}}>
+                      <CircuitTimer work={work} rest={rest} rounds={rounds} exercises={playerExercises}
+                        onStation={(i) => setCircuitStIdx(i)}/>
+                    </div>
+                  )}
+                </>
               )}
             </div>
 
@@ -612,10 +657,24 @@ function App() {
                 </div>
               ) : (
                 <>
-                  <CircuitRing stations={circuitExercises} activeIdx={circuitStIdx} timerIdx={circuitStIdx}
-                    onSelect={admin ? (i) => setCircuitStIdx(i) : null}/>
-                  <CircuitTimer work={work} rest={rest} rounds={rounds} exercises={circuitExercises}
-                    onStation={(i) => setCircuitStIdx(i)}/>
+                  <CircuitRing stations={circuitExercises} selectedIdx={circuitStIdx}
+                    onSelect={(i) => setCircuitStIdx(i)}/>
+                  {/* Selected exercise detail card */}
+                  {circuitStIdx >= 0 && circuitStIdx < circuitExercises.length && (
+                    <div style={{background:BH.white, padding:"16px", borderRadius:"8px", border:`2px solid ${BH.gold}`, marginTop:"16px", textAlign:"center"}}>
+                      <div style={{fontSize:"16px", fontWeight:"bold", color:BH.navy, marginBottom:"4px"}}>
+                        {circuitExercises[circuitStIdx].name}
+                      </div>
+                      <div style={{fontSize:"13px", color:BH.g700, marginBottom:"8px"}}>
+                        {circuitExercises[circuitStIdx].desc}
+                      </div>
+                      <div style={{display:"flex", justifyContent:"center", gap:"16px", fontSize:"12px", color:BH.g500}}>
+                        <span>{circuitExercises[circuitStIdx].reps}</span>
+                        <span>•</span>
+                        <span>{circuitExercises[circuitStIdx].equip}</span>
+                      </div>
+                    </div>
+                  )}
                 </>
               )}
             </div>
