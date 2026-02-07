@@ -198,6 +198,12 @@ function LoginModal({onLogin, onClose}) {
 
 // App Component
 function App() {
+  const SUPABASE_URL = "https://uievqtckkotplvyfqshu.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_8YcUvmNO3QWfFqOnqMKcdg_y_-L2QRg";
+  const sb = (window.supabase && window.supabase.createClient)
+    ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+    : null;
+
   const [tab, setTab] = React.useState("circuits");
   const [admin, setAdmin] = React.useState(false);
   const [showLogin, setShowLogin] = React.useState(false);
@@ -229,18 +235,36 @@ function App() {
     if (h.startsWith("config=")) {
       try { cfg = JSON.parse(atob(h.slice(7))); } catch(e) {}
     }
-    if (!cfg) {
-      const lc = localStorage.getItem("bh-tennis-published");
-      if (lc) try { cfg = JSON.parse(lc); } catch(e) {}
-    }
+    const applyCfg = (c) => {
+      if (!c) return;
+      setPubDrills(c.drills || []);
+      setPubExercises(c.exercises || []);
+      setSelDrills(c.drills || []);
+      setSelExercises(c.exercises || []);
+      setWork(c.work || 45);
+      setRest(c.rest || 15);
+      setRounds(c.rounds || 3);
+    };
+    const loadFromSupabase = async () => {
+      if (!sb) return null;
+      const { data, error } = await sb.from("published_plan").select("data").eq("id", 1).single();
+      if (error) return null;
+      return data && data.data ? data.data : null;
+    };
     if (cfg) {
-      setPubDrills(cfg.drills || []);
-      setPubExercises(cfg.exercises || []);
-      setSelDrills(cfg.drills || []);
-      setSelExercises(cfg.exercises || []);
-      setWork(cfg.work || 45);
-      setRest(cfg.rest || 15);
-      setRounds(cfg.rounds || 3);
+      applyCfg(cfg);
+    } else {
+      (async () => {
+        const sbCfg = await loadFromSupabase();
+        if (sbCfg) {
+          applyCfg(sbCfg);
+        } else {
+          const lc = localStorage.getItem("bh-tennis-published");
+          if (lc) {
+            try { applyCfg(JSON.parse(lc)); } catch(e) {}
+          }
+        }
+      })();
     }
     if (sessionStorage.getItem("bh-admin")) setAdmin(true);
   }, []);
@@ -252,14 +276,32 @@ function App() {
   // Publish handler
   const handlePublish = () => {
     const cfg = { drills: selDrills, exercises: selExercises, work, rest, rounds };
-    localStorage.setItem("bh-tennis-published", JSON.stringify(cfg));
-    setPubDrills(selDrills);
-    setPubExercises(selExercises);
-    const url = window.location.origin + window.location.pathname + "#config=" + btoa(JSON.stringify(cfg));
-    navigator.clipboard.writeText(url).then(() => {
-      setToast("Plan published! Link copied to clipboard.");
-      setTimeout(() => setToast(""), 3000);
-    });
+    const doLocalPublish = () => {
+      localStorage.setItem("bh-tennis-published", JSON.stringify(cfg));
+      setPubDrills(selDrills);
+      setPubExercises(selExercises);
+      const url = window.location.origin + window.location.pathname + "#config=" + btoa(JSON.stringify(cfg));
+      navigator.clipboard.writeText(url).then(() => {
+        setToast("Plan published! Link copied to clipboard.");
+        setTimeout(() => setToast(""), 3000);
+      });
+    };
+    if (sb) {
+      sb.from("published_plan").upsert({ id: 1, data: cfg }).then(({ error }) => {
+        if (error) {
+          doLocalPublish();
+          setToast("Published locally. Supabase write failed.");
+          setTimeout(() => setToast(""), 4000);
+          return;
+        }
+        setPubDrills(selDrills);
+        setPubExercises(selExercises);
+        setToast("Plan published for everyone!");
+        setTimeout(() => setToast(""), 3000);
+      });
+    } else {
+      doLocalPublish();
+    }
   };
 
   // Toggle drill selection (admin)
