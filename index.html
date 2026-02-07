@@ -1195,7 +1195,7 @@ function DrillViewer({drill}) {
 }
 
 // DrillTimer Component
-function DrillTimer({duration, resetKey, onNext, canNext, onToggle, toggleLabel}) {
+function DrillTimer({duration, resetKey, onNext, canNext}) {
   const [running, setRunning] = React.useState(false);
   const [timeLeft, setTimeLeft] = React.useState(duration);
   const tmr = React.useRef(null);
@@ -1246,15 +1246,7 @@ function DrillTimer({duration, resetKey, onNext, canNext, onToggle, toggleLabel}
     <div style={{background:BH.white, border:`1px solid ${BH.g300}`, borderRadius:"8px", padding:"12px 14px", marginBottom:"10px"}}>
       <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"8px", gap:"8px"}}>
         <div style={{fontSize:"12px", fontWeight:"bold", color:BH.navy}}>Drill Timer</div>
-        <div style={{display:"flex", alignItems:"center", gap:"8px"}}>
-          <div style={{fontSize:"18px", fontWeight:"bold", color:BH.maroon}}>{mm}:{ss}</div>
-          {onToggle && (
-            <button onClick={onToggle} style={{
-              padding:"4px 8px", background:BH.g200, color:BH.navy, border:`1px solid ${BH.g300}`,
-              borderRadius:"6px", cursor:"pointer", fontSize:"10px", fontWeight:"bold"
-            }}>{toggleLabel || "Hide"}</button>
-          )}
-        </div>
+        <div style={{fontSize:"18px", fontWeight:"bold", color:BH.maroon}}>{mm}:{ss}</div>
       </div>
       <div style={{display:"flex", gap:"8px", flexWrap:"wrap"}}>
         <button onClick={() => setRunning(r => !r)} style={btn(running ? BH.shotRed : BH.shotBlue)}>
@@ -1352,7 +1344,6 @@ function App() {
   const [drSkill, setDrSkill] = React.useState("All");
   const [exCat, setExCat] = React.useState("All");
   const [viewDrill, setViewDrill] = React.useState(null);
-  const [showDrillTimer, setShowDrillTimer] = React.useState(true);
   const [toast, setToast] = React.useState("");
   const [circuitStIdx, setCircuitStIdx] = React.useState(-1);
 
@@ -1693,15 +1684,13 @@ function App() {
 
               {/* Right: Drill Viewer */}
               <div style={{flex:1, minWidth:0, position:"relative"}}>
-                {showDrillTimer && viewDrill && (
+                {viewDrill && (
                   <div style={{position:"absolute", top:0, right:0, zIndex:5, width:"260px"}}>
                     <DrillTimer
                       duration={currentDrillTimeSafe}
                       resetKey={viewDrill}
                       onNext={goNextDrill}
                       canNext={canNextDrill}
-                      onToggle={() => setShowDrillTimer(false)}
-                      toggleLabel="Hide"
                     />
                   </div>
                 )}
@@ -1903,14 +1892,6 @@ function App() {
                               allowFullScreen style={{position:"absolute", top:0, left:0, width:"100%", height:"100%"}}/>
                           </div>
                         </div>
-                    )}
-                    {!showDrillTimer && (
-                      <div style={{padding:"10px 16px", borderTop:`1px solid ${BH.g200}`, textAlign:"center"}}>
-                        <button onClick={() => setShowDrillTimer(true)} style={{
-                          padding:"6px 12px", background:BH.g200, color:BH.navy, border:`1px solid ${BH.g300}`,
-                          borderRadius:"6px", cursor:"pointer", fontSize:"12px", fontWeight:"bold"
-                        }}>Show Timer</button>
-                      </div>
                     )}
                   </div>
                 )}
