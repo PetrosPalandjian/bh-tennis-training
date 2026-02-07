@@ -55,9 +55,9 @@ const snd={
 async function sha256(msg){const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(msg));return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');}
 
 const EXERCISES=[
-  {id:"russian-twist",name:"Russian Twists",cat:"Core",desc:"Seated twists with med ball. Feet off ground, rotate fully side to side.",reps:"20 reps",equip:"Med Ball 8-12lb"},
-  {id:"plank",name:"Plank Hold",cat:"Core",desc:"Forearm plank, tight core, hips level. Don't let hips sag.",reps:"45 sec",equip:"None"},
-  {id:"bicycle",name:"Bicycle Crunches",cat:"Core",desc:"Alternating elbow-to-knee crunches. Controlled, no yanking the neck.",reps:"20 each",equip:"None"},
+  {id:"russian-twist",name:"Russian Twists",cat:"Core",desc:"Seated twists with med ball. Feet off ground, rotate fully side to side.",reps:"20 reps",equip:"Med Ball 8-12lb",youtubeId:"S_odouUnGOc"},
+  {id:"plank",name:"Plank Hold",cat:"Core",desc:"Forearm plank, tight core, hips level. Don't let hips sag.",reps:"45 sec",equip:"None",youtubeId:"pvIjsG5Svck",youtubeStart:0,youtubeEnd:15},
+  {id:"bicycle",name:"Bicycle Crunches",cat:"Core",desc:"Alternating elbow-to-knee crunches. Controlled, no yanking the neck.",reps:"20 each",equip:"None",youtubeId:"hP-ol0LxLZ8",youtubeStart:3,youtubeEnd:29},
   {id:"dead-bug",name:"Dead Bugs",cat:"Core",desc:"Lying on back, extend opposite arm/leg while keeping low back flat.",reps:"10 each",equip:"None"},
   {id:"v-ups",name:"V-Ups",cat:"Core",desc:"Simultaneously lift legs and torso to touch toes at the top.",reps:"15 reps",equip:"None"},
   {id:"side-plank",name:"Side Plank",cat:"Core",desc:"Forearm side plank, hips stacked. Hold each side.",reps:"30s each",equip:"None"},
@@ -1738,6 +1738,25 @@ function App() {
                         <span>•</span>
                         <span>{circuitExercises[circuitStIdx].equip}</span>
                       </div>
+                      {circuitExercises[circuitStIdx].youtubeId && (
+                        <div style={{borderRadius:"8px", overflow:"hidden", border:`1px solid ${BH.g300}`, marginTop:"12px", textAlign:"left"}}>
+                          <div style={{padding:"8px 12px", background:BH.navy, display:"flex", alignItems:"center", gap:"8px"}}>
+                            <span style={{fontSize:"12px", fontWeight:"bold", color:BH.white}}>Video Demo</span>
+                            {(circuitExercises[circuitStIdx].youtubeStart || circuitExercises[circuitStIdx].youtubeEnd) && (
+                              <span style={{fontSize:"10px", color:BH.maroon, opacity:0.8}}>
+                                {circuitExercises[circuitStIdx].youtubeStart ? `from ${Math.floor(circuitExercises[circuitStIdx].youtubeStart/60)}:${String(circuitExercises[circuitStIdx].youtubeStart%60).padStart(2,"0")}` : ""}
+                                {circuitExercises[circuitStIdx].youtubeEnd ? ` to ${Math.floor(circuitExercises[circuitStIdx].youtubeEnd/60)}:${String(circuitExercises[circuitStIdx].youtubeEnd%60).padStart(2,"0")}` : ""}
+                              </span>
+                            )}
+                          </div>
+                          <div style={{position:"relative", paddingBottom:"56.25%", height:0, overflow:"hidden"}}>
+                            <iframe
+                              src={`https://www.youtube.com/embed/${circuitExercises[circuitStIdx].youtubeId}?${circuitExercises[circuitStIdx].youtubeStart ? "start="+circuitExercises[circuitStIdx].youtubeStart : ""}${circuitExercises[circuitStIdx].youtubeEnd ? "&end="+circuitExercises[circuitStIdx].youtubeEnd : ""}&rel=0&modestbranding=1`}
+                              frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope"
+                              allowFullScreen style={{position:"absolute", top:0, left:0, width:"100%", height:"100%"}}/>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </>

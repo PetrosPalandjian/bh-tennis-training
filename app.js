@@ -695,6 +695,25 @@ function App() {
                         <span>•</span>
                         <span>{circuitExercises[circuitStIdx].equip}</span>
                       </div>
+                      {circuitExercises[circuitStIdx].youtubeId && (
+                        <div style={{borderRadius:"8px", overflow:"hidden", border:`1px solid ${BH.g300}`, marginTop:"12px", textAlign:"left"}}>
+                          <div style={{padding:"8px 12px", background:BH.navy, display:"flex", alignItems:"center", gap:"8px"}}>
+                            <span style={{fontSize:"12px", fontWeight:"bold", color:BH.white}}>Video Demo</span>
+                            {(circuitExercises[circuitStIdx].youtubeStart || circuitExercises[circuitStIdx].youtubeEnd) && (
+                              <span style={{fontSize:"10px", color:BH.maroon, opacity:0.8}}>
+                                {circuitExercises[circuitStIdx].youtubeStart ? `from ${Math.floor(circuitExercises[circuitStIdx].youtubeStart/60)}:${String(circuitExercises[circuitStIdx].youtubeStart%60).padStart(2,"0")}` : ""}
+                                {circuitExercises[circuitStIdx].youtubeEnd ? ` to ${Math.floor(circuitExercises[circuitStIdx].youtubeEnd/60)}:${String(circuitExercises[circuitStIdx].youtubeEnd%60).padStart(2,"0")}` : ""}
+                              </span>
+                            )}
+                          </div>
+                          <div style={{position:"relative", paddingBottom:"56.25%", height:0, overflow:"hidden"}}>
+                            <iframe
+                              src={`https://www.youtube.com/embed/${circuitExercises[circuitStIdx].youtubeId}?${circuitExercises[circuitStIdx].youtubeStart ? "start="+circuitExercises[circuitStIdx].youtubeStart : ""}${circuitExercises[circuitStIdx].youtubeEnd ? "&end="+circuitExercises[circuitStIdx].youtubeEnd : ""}&rel=0&modestbranding=1`}
+                              frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope"
+                              allowFullScreen style={{position:"absolute", top:0, left:0, width:"100%", height:"100%"}}/>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </>
