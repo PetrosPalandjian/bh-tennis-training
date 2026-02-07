@@ -1,6 +1,6 @@
 const BH = {
   navy:"#1B365D",navyLight:"#2C5282",navyDark:"#0F1F38",
-  gold:"#C9A227",goldLight:"#D4B94E",goldDim:"#A8892A",
+  maroon:"#7A1C2A",maroonLight:"#943548",maroonDim:"#5E1520",
   white:"#FFF",offWhite:"#F7F8FA",
   g100:"#F3F4F6",g200:"#E5E7EB",g300:"#D1D5DB",
   g400:"#9CA3AF",g500:"#6B7280",g700:"#374151",g800:"#1F2937",
@@ -70,13 +70,17 @@ const DRILLS=[
     desc:"Rally crosscourt FH from deuce side. Both players start on the deuce (right) side of the baseline. Hit forehands diagonally crosscourt to each other, aiming deep into the service box corner. Focus on consistent topspin, high net clearance, and recovering to center after each shot.",
     tips:["Keep a high net clearance — aim 3-5 feet over the net","Follow through across your body for natural topspin","Small split step between shots to stay balanced","Turn sideways before contact and rotate through the core","Use targets or cones in the crosscourt zone to build accuracy"],
     youtubeId:"UwIPqGkQO80",youtubeStart:80,youtubeEnd:150,courtType:"singles",
-    players:[{id:"A",x:72,y:92,color:BH.shotBlue},{id:"B",x:28,y:8,color:BH.shotRed}],
+    players:[{id:"A",x:50,y:95,color:BH.shotBlue},{id:"B",x:50,y:5,color:BH.shotRed}],
     steps:[
-      {t:"hit",f:[72,92],to:[28,8],c:BH.shotBlue,n:"1",shot:"forehand",hitter:"A"},
-      {t:"move",f:[72,92],to:[50,80],c:BH.shotBlue},
-      {t:"hit",f:[28,8],to:[72,8],c:BH.shotRed,n:"2",shot:"forehand",hitter:"B"},
-      {t:"move",f:[28,8],to:[50,20],c:BH.shotRed},
-      {t:"hit",f:[50,80],to:[28,8],c:BH.shotBlue,n:"3",shot:"forehand",hitter:"A"}
+      {t:"move",f:[50,95],to:[72,95],c:BH.shotBlue,note:"A moves to deuce side"},
+      {t:"hit",f:[72,95],to:[28,8],c:BH.shotBlue,n:"1",shot:"forehand",hitter:"A",note:"Crosscourt FH deep"},
+      {t:"move",f:[72,95],to:[50,95],c:BH.shotBlue,note:"A recovers to center"},
+      {t:"move",f:[50,5],to:[28,5],c:BH.shotRed,note:"B moves to ball"},
+      {t:"hit",f:[28,5],to:[72,95],c:BH.shotRed,n:"2",shot:"forehand",hitter:"B",note:"Crosscourt FH back"},
+      {t:"move",f:[28,5],to:[50,5],c:BH.shotRed,note:"B recovers to center"},
+      {t:"move",f:[50,95],to:[72,95],c:BH.shotBlue,note:"A moves to ball"},
+      {t:"hit",f:[72,95],to:[28,8],c:BH.shotBlue,n:"3",shot:"forehand",hitter:"A",note:"Crosscourt FH deep"},
+      {t:"move",f:[72,95],to:[50,95],c:BH.shotBlue,note:"A recovers to center"}
     ]
   },
   {

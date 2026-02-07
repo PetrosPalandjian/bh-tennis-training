@@ -60,7 +60,7 @@ function CircuitRing({stations, selectedIdx, onSelect, onRemove}) {
 
         // All stations are navy, selected gets gold border
         const fillCol = BH.navy;
-        const strokeCol = isSelected ? BH.gold : BH.g400;
+        const strokeCol = isSelected ? BH.maroon : BH.g400;
         const strokeW = isSelected ? 3 : 1.5;
 
         // Wrap exercise name
@@ -302,7 +302,7 @@ function CircuitTimer({work, rest, rounds, exercises, onStation, onPhaseInfo}) {
           <div style={{color: BH.g500, fontSize: "13px"}}>Ready to start</div>
         )}
         {phase === "done" && (
-          <div style={{fontWeight: "bold", color: BH.gold}}>CIRCUIT COMPLETE!</div>
+          <div style={{fontWeight: "bold", color: BH.maroon}}>CIRCUIT COMPLETE!</div>
         )}
         {(phase === "station" || phase === "pausedStation") && (
           <>

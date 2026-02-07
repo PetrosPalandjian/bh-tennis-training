@@ -52,7 +52,7 @@ function PlayerIcon({px, py, color, label, shot, courtY}) {
           <rect x={badgeX - 13} y={badgeY - 7} width={26} height={14}
                 rx={3} fill={BH.navy} stroke={BH.white} strokeWidth={1.2}/>
           <text x={badgeX} y={badgeY + 1} textAnchor="middle" dominantBaseline="middle"
-                fontSize="8" fontWeight="bold" fill={BH.gold}
+                fontSize="8" fontWeight="bold" fill={BH.white}
                 style={{letterSpacing:"0.5px"}}>{info.abbr}</text>
         </g>
       )}

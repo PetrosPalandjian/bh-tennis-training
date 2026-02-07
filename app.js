@@ -35,7 +35,7 @@ function DrillViewer({drill}) {
   const btn = (bg, small) => ({
     padding: small ? "6px 10px" : "8px 14px",
     background: bg,
-    color: bg === BH.gold ? BH.navy : BH.white,
+    color: BH.white,
     border: "none",
     borderRadius: "6px",
     cursor: "pointer",
@@ -58,7 +58,7 @@ function DrillViewer({drill}) {
       {/* Step counter */}
       <div style={{textAlign:"center", fontSize:"13px", color:BH.g700, fontWeight:"bold"}}>
         Step {Math.max(0, step) + 1} / {steps.length}
-        {showAll && <span style={{color:BH.gold, marginLeft:"8px"}}>(All visible)</span>}
+        {showAll && <span style={{color:BH.maroon, marginLeft:"8px"}}>(All visible)</span>}
       </div>
 
       {/* Playback controls */}
@@ -80,7 +80,7 @@ function DrillViewer({drill}) {
                 disabled={step >= maxStep}>
           Next →
         </button>
-        <button onClick={() => { setShowAll(!showAll); setStep(maxStep); }} style={btn(BH.gold)}>
+        <button onClick={() => { setShowAll(!showAll); setStep(maxStep); }} style={btn(BH.maroon)}>
           {showAll ? "Step View" : "Show All"}
         </button>
       </div>
@@ -100,12 +100,12 @@ function DrillViewer({drill}) {
             <div key={i} style={{
               padding:"6px 10px", marginBottom:"2px", borderRadius:"4px", fontSize:"12px",
               display:"flex", gap:"8px", alignItems:"center",
-              background: isActive ? BH.gold : "transparent",
-              color: isActive ? BH.navy : isPast ? BH.g400 : BH.g700,
+              background: isActive ? BH.maroon : "transparent",
+              color: isActive ? BH.white : isPast ? BH.g400 : BH.g700,
               fontWeight: isActive ? "bold" : "normal",
               transition: "all 0.2s"
             }}>
-              <span style={{minWidth:"20px", fontWeight:"bold", color: isActive ? BH.navy : BH.g400}}>
+              <span style={{minWidth:"20px", fontWeight:"bold", color: isActive ? BH.white : BH.g400}}>
                 {s.t === "hit" ? s.n : "·"}
               </span>
               <span>{desc}</span>
@@ -132,16 +132,18 @@ function DrillViewer({drill}) {
           <div style={{padding:"8px 12px", background:BH.navy, display:"flex", alignItems:"center", gap:"8px"}}>
             <span style={{fontSize:"12px", fontWeight:"bold", color:BH.white}}>Video Demo</span>
             {(drill.youtubeStart || drill.youtubeEnd) && (
-              <span style={{fontSize:"10px", color:BH.gold, opacity:0.8}}>
+              <span style={{fontSize:"10px", color:BH.maroon, opacity:0.8}}>
                 {drill.youtubeStart ? `from ${Math.floor(drill.youtubeStart/60)}:${String(drill.youtubeStart%60).padStart(2,"0")}` : ""}
                 {drill.youtubeEnd ? ` to ${Math.floor(drill.youtubeEnd/60)}:${String(drill.youtubeEnd%60).padStart(2,"0")}` : ""}
               </span>
             )}
           </div>
-          <iframe width="100%" height="220"
-            src={`https://www.youtube.com/embed/${drill.youtubeId}?${drill.youtubeStart ? "start="+drill.youtubeStart : ""}${drill.youtubeEnd ? "&end="+drill.youtubeEnd : ""}&rel=0&modestbranding=1`}
-            frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope"
-            allowFullScreen style={{display:"block"}}/>
+          <div style={{position:"relative", paddingBottom:"56.25%", height:0, overflow:"hidden"}}>
+            <iframe
+              src={`https://www.youtube.com/embed/${drill.youtubeId}?${drill.youtubeStart ? "start="+drill.youtubeStart : ""}${drill.youtubeEnd ? "&end="+drill.youtubeEnd : ""}&rel=0&modestbranding=1`}
+              frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope"
+              allowFullScreen style={{position:"absolute", top:0, left:0, width:"100%", height:"100%"}}/>
+          </div>
         </div>
       )}
     </div>
@@ -196,7 +198,7 @@ function LoginModal({onLogin, onClose}) {
 
 // App Component
 function App() {
-  const [tab, setTab] = React.useState("drills");
+  const [tab, setTab] = React.useState("circuits");
   const [admin, setAdmin] = React.useState(false);
   const [showLogin, setShowLogin] = React.useState(false);
 
@@ -321,15 +323,15 @@ function App() {
                       justifyContent:"space-between", alignItems:"center",
                       boxShadow:"0 2px 8px rgba(0,0,0,0.15)"}}>
         <div>
-          <div style={{fontSize:"18px", fontWeight:"bold", color:BH.gold, letterSpacing:"1px"}}>BELMONT HILL</div>
+          <div style={{fontSize:"18px", fontWeight:"bold", color:BH.maroon, letterSpacing:"1px"}}>BELMONT HILL</div>
           <div style={{fontSize:"12px", opacity:0.85}}>Varsity Tennis Training</div>
         </div>
         <div style={{display:"flex", gap:"12px", alignItems:"center"}}>
           {admin ? (
             <>
-              <span style={{fontSize:"11px", background:BH.gold, color:BH.navy, padding:"4px 10px",
+              <span style={{fontSize:"11px", background:BH.maroon, color:BH.white, padding:"4px 10px",
                             borderRadius:"4px", fontWeight:"bold"}}>ADMIN</span>
-              <button onClick={handlePublish} style={{padding:"8px 14px", background:BH.gold, color:BH.navy,
+              <button onClick={handlePublish} style={{padding:"8px 14px", background:BH.maroon, color:BH.white,
                 border:"none", borderRadius:"6px", cursor:"pointer", fontSize:"12px", fontWeight:"bold"}}>
                 Publish Plan
               </button>
@@ -439,9 +441,9 @@ function App() {
                     </div>
 
                     {/* Today's Plan summary */}
-                    <div style={{background:BH.white, borderRadius:"8px", border:`2px solid ${BH.gold}`,
+                    <div style={{background:BH.white, borderRadius:"8px", border:`2px solid ${BH.maroon}`,
                                  marginTop:"16px", overflow:"hidden"}}>
-                      <div style={{padding:"10px 14px", background:BH.gold, color:BH.navy,
+                      <div style={{padding:"10px 14px", background:BH.maroon, color:BH.white,
                                    fontSize:"13px", fontWeight:"bold"}}>
                         Today's Plan ({selDrills.length} drills)
                       </div>
@@ -457,7 +459,7 @@ function App() {
                             return (
                               <div key={id} style={{display:"flex", gap:"8px", alignItems:"center", padding:"4px 0",
                                 borderBottom:i < selDrills.length-1 ? `1px solid ${BH.g100}` : "none"}}>
-                                <span style={{fontSize:"11px", fontWeight:"bold", color:BH.gold, minWidth:"18px"}}>{i+1}.</span>
+                                <span style={{fontSize:"11px", fontWeight:"bold", color:BH.maroon, minWidth:"18px"}}>{i+1}.</span>
                                 <span style={{fontSize:"12px", color:BH.navy}}>{d.name}</span>
                                 <button onClick={() => toggleDrill(id)} style={{marginLeft:"auto", background:"none",
                                   border:"none", cursor:"pointer", fontSize:"14px", color:BH.g400, padding:"0 2px"}}>×</button>
@@ -470,8 +472,8 @@ function App() {
                   </>
                 ) : (
                   /* Non-Admin: Today's Plan (read-only numbered list) */
-                  <div style={{background:BH.white, borderRadius:"8px", border:`2px solid ${BH.gold}`, overflow:"hidden"}}>
-                    <div style={{padding:"12px 16px", background:BH.gold, color:BH.navy}}>
+                  <div style={{background:BH.white, borderRadius:"8px", border:`2px solid ${BH.maroon}`, overflow:"hidden"}}>
+                    <div style={{padding:"12px 16px", background:BH.maroon, color:BH.white}}>
                       <div style={{fontSize:"15px", fontWeight:"bold"}}>Today's Plan</div>
                       <div style={{fontSize:"11px", opacity:0.8}}>{playerDrills.length} drills</div>
                     </div>
@@ -486,7 +488,7 @@ function App() {
                             style={{padding:"10px 16px", display:"flex", gap:"10px", alignItems:"center",
                               cursor:"pointer", borderBottom:`1px solid ${BH.g100}`,
                               background:viewDrill===d.id ? `rgba(201,162,39,0.12)` : "transparent"}}>
-                            <span style={{fontSize:"14px", fontWeight:"bold", color:BH.gold, minWidth:"24px"}}>{i+1}</span>
+                            <span style={{fontSize:"14px", fontWeight:"bold", color:BH.maroon, minWidth:"24px"}}>{i+1}</span>
                             <div>
                               <div style={{fontSize:"13px", fontWeight:"bold", color:BH.navy}}>{d.name}</div>
                               <div style={{fontSize:"11px", color:BH.g500}}>{d.desc}</div>
@@ -582,9 +584,9 @@ function App() {
                   </div>
 
                   {/* Selected exercises summary */}
-                  <div style={{background:BH.white, borderRadius:"8px", border:`2px solid ${BH.gold}`,
+                  <div style={{background:BH.white, borderRadius:"8px", border:`2px solid ${BH.maroon}`,
                                marginTop:"16px", overflow:"hidden"}}>
-                    <div style={{padding:"10px 14px", background:BH.gold, color:BH.navy,
+                    <div style={{padding:"10px 14px", background:BH.maroon, color:BH.white,
                                  fontSize:"13px", fontWeight:"bold"}}>
                       Today's Circuit ({selExercises.length} exercises)
                     </div>
@@ -599,7 +601,7 @@ function App() {
                           if (!e) return null;
                           return (
                             <div key={id} style={{display:"flex", gap:"8px", alignItems:"center", padding:"3px 0"}}>
-                              <span style={{fontSize:"11px", fontWeight:"bold", color:BH.gold, minWidth:"18px"}}>{i+1}.</span>
+                              <span style={{fontSize:"11px", fontWeight:"bold", color:BH.maroon, minWidth:"18px"}}>{i+1}.</span>
                               <span style={{fontSize:"12px", color:BH.navy}}>{e.name}</span>
                               <button onClick={() => toggleExercise(id)} style={{marginLeft:"auto", background:"none",
                                 border:"none", cursor:"pointer", fontSize:"14px", color:BH.g400}}>×</button>
@@ -620,8 +622,8 @@ function App() {
               ) : (
                 /* Non-Admin: Published circuit (read-only) */
                 <>
-                  <div style={{background:BH.white, borderRadius:"8px", border:`2px solid ${BH.gold}`, overflow:"hidden"}}>
-                    <div style={{padding:"12px 16px", background:BH.gold, color:BH.navy}}>
+                  <div style={{background:BH.white, borderRadius:"8px", border:`2px solid ${BH.maroon}`, overflow:"hidden"}}>
+                    <div style={{padding:"12px 16px", background:BH.maroon, color:BH.white}}>
                       <div style={{fontSize:"15px", fontWeight:"bold"}}>Today's Circuit</div>
                       <div style={{fontSize:"11px", opacity:0.8}}>
                         {playerExercises.length} exercises • {work}s work / {rest}s rest • {rounds} rounds
@@ -637,7 +639,7 @@ function App() {
                           <div key={e.id} style={{padding:"8px 16px", display:"flex", gap:"10px", alignItems:"center",
                             borderBottom:`1px solid ${BH.g100}`,
                             background:circuitStIdx===i ? `rgba(201,162,39,0.12)` : "transparent"}}>
-                            <span style={{fontSize:"14px", fontWeight:"bold", color:BH.gold, minWidth:"24px"}}>{i+1}</span>
+                            <span style={{fontSize:"14px", fontWeight:"bold", color:BH.maroon, minWidth:"24px"}}>{i+1}</span>
                             <div>
                               <div style={{fontSize:"13px", fontWeight:"bold", color:BH.navy}}>{e.name}</div>
                               <div style={{fontSize:"11px", color:BH.g500}}>{e.reps} • {e.equip}</div>
@@ -678,7 +680,7 @@ function App() {
                     } : null}/>
                   {/* Selected exercise detail card */}
                   {circuitStIdx >= 0 && circuitStIdx < circuitExercises.length && (
-                    <div style={{background:BH.white, padding:"16px", borderRadius:"8px", border:`2px solid ${BH.gold}`, marginTop:"16px", textAlign:"center"}}>
+                    <div style={{background:BH.white, padding:"16px", borderRadius:"8px", border:`2px solid ${BH.maroon}`, marginTop:"16px", textAlign:"center"}}>
                       <div style={{fontSize:"16px", fontWeight:"bold", color:BH.navy, marginBottom:"4px"}}>
                         {circuitExercises[circuitStIdx].name}
                       </div>
