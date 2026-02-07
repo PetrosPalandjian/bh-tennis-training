@@ -284,6 +284,8 @@ function App() {
   const [admin, setAdmin] = React.useState(false);
   const [showLogin, setShowLogin] = React.useState(false);
   const [drillTime, setDrillTime] = React.useState(90);
+  const [isMobile, setIsMobile] = React.useState(window.innerWidth < 900);
+  const [isSmall, setIsSmall] = React.useState(window.innerWidth < 768);
 
   // Published plan state
   const [pubDrills, setPubDrills] = React.useState([]);
@@ -357,6 +359,16 @@ function App() {
       })();
     }
     if (sessionStorage.getItem("bh-admin")) setAdmin(true);
+  }, []);
+
+  // Track viewport for responsive layout
+  React.useEffect(() => {
+    const onResize = () => {
+      setIsMobile(window.innerWidth < 900);
+      setIsSmall(window.innerWidth < 768);
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
   }, []);
 
   // Login/logout handlers
@@ -528,9 +540,9 @@ function App() {
         {tab === "drills" && (
           (
             /* Drills View */
-            <div style={{display:"flex", gap:"20px"}}>
+            <div style={{display:"flex", gap:"20px", flexDirection:isMobile ? "column" : "row"}}>
               {/* Left sidebar */}
-              <div style={{width:"300px", flexShrink:0}}>
+              <div style={{width:isMobile ? "100%" : "300px", flexShrink:0}}>
 
                 {admin ? (
                   /* Admin: category filter + drill list with checkboxes + today's plan summary */
@@ -544,22 +556,22 @@ function App() {
 
                     {/* Drill list with checkboxes */}
                     <div style={{background:BH.white, borderRadius:"8px", border:`1px solid ${BH.g300}`,
-                                 maxHeight:"350px", overflowY:"auto"}}>
+                                 maxHeight:isSmall ? "260px" : "350px", overflowY:"auto"}}>
                       <div style={{padding:"12px 14px", borderBottom:`1px solid ${BH.g200}`,
                                    fontSize:"13px", fontWeight:"bold", color:BH.navy}}>
                         All Drills
                       </div>
                       {filteredDrills.map(d => (
-                        <div key={d.id} style={{padding:"8px 14px", display:"flex", gap:"8px", alignItems:"center",
+                        <div key={d.id} style={{padding:isSmall ? "10px 14px" : "8px 14px", display:"flex", gap:"8px", alignItems:"center",
                           cursor:"pointer", borderBottom:`1px solid ${BH.g100}`,
                           background:viewDrill===d.id ? `rgba(59,130,246,0.08)` : "transparent"}}
                           onClick={() => setViewDrill(d.id)}>
                           <input type="checkbox" checked={selDrills.some(x => x.id === d.id)}
                             onChange={(e) => { e.stopPropagation(); toggleDrill(d.id); }}
-                            style={{cursor:"pointer", accentColor:BH.navy}}/>
+                            style={{cursor:"pointer", accentColor:BH.navy, transform:isSmall ? "scale(1.1)" : "none"}}/>
                           <div style={{flex:1}}>
-                            <div style={{fontSize:"12px", fontWeight:"bold", color:BH.navy}}>{d.name}</div>
-                            <div style={{fontSize:"10px", color:BH.g500}}>{d.skill || d.cat} • {d.diff}</div>
+                            <div style={{fontSize:isSmall ? "13px" : "12px", fontWeight:"bold", color:BH.navy}}>{d.name}</div>
+                            <div style={{fontSize:isSmall ? "11px" : "10px", color:BH.g500}}>{d.skill || d.cat} • {d.diff}</div>
                           </div>
                         </div>
                       ))}
@@ -572,7 +584,7 @@ function App() {
                                    fontSize:"13px", fontWeight:"bold"}}>
                         Today's Plan ({selDrills.length} drills)
                       </div>
-                      <div style={{padding:"8px 14px", maxHeight:"200px", overflowY:"auto"}}>
+                      <div style={{padding:"8px 14px", maxHeight:isSmall ? "180px" : "200px", overflowY:"auto"}}>
                         {selDrills.length === 0 ? (
                           <div style={{fontSize:"12px", color:BH.g500, padding:"8px 0"}}>
                             Check drills above to build today's plan
@@ -582,11 +594,11 @@ function App() {
                             const d = DRILLS.find(dr => dr.id === entry.id);
                             if (!d) return null;
                             return (
-                              <div key={entry.id} style={{display:"flex", gap:"8px", alignItems:"center", padding:"4px 0",
+                              <div key={entry.id} style={{display:"flex", gap:"8px", alignItems:"center", padding:isSmall ? "6px 0" : "4px 0",
                                 borderBottom:i < selDrills.length-1 ? `1px solid ${BH.g100}` : "none"}}>
                                 <span style={{fontSize:"11px", fontWeight:"bold", color:BH.maroon, minWidth:"18px"}}>{i+1}.</span>
                                 <div style={{display:"flex", flexDirection:"column", gap:"2px"}}>
-                                  <span style={{fontSize:"12px", color:BH.navy}}>{d.name}</span>
+                                  <span style={{fontSize:isSmall ? "13px" : "12px", color:BH.navy}}>{d.name}</span>
                                   <div style={{display:"flex", alignItems:"center", gap:"6px"}}>
                                     <span style={{fontSize:"10px", color:BH.g500}}>Time (sec)</span>
                                     <input type="number" value={entry.time}
@@ -594,7 +606,7 @@ function App() {
                                         const v = Math.max(10, Math.min(900, +e.target.value || 0));
                                         setSelDrills(sel => sel.map(x => x.id === entry.id ? { ...x, time: v } : x));
                                       }}
-                                      style={{width:"64px", padding:"2px 6px", border:`1px solid ${BH.g300}`, borderRadius:"4px", fontSize:"11px"}}/>
+                                      style={{width:isSmall ? "72px" : "64px", padding:"4px 6px", border:`1px solid ${BH.g300}`, borderRadius:"4px", fontSize:"12px"}}/>
                                   </div>
                                 </div>
                                 <button onClick={() => toggleDrill(entry.id)} style={{marginLeft:"auto", background:"none",
@@ -641,7 +653,14 @@ function App() {
               {/* Right: Drill Viewer */}
               <div style={{flex:1, minWidth:0, position:"relative"}}>
                 {viewDrill && (
-                  <div style={{position:"absolute", top:0, right:0, zIndex:5, width:"260px"}}>
+                  <div style={{
+                    position: isMobile ? "relative" : "absolute",
+                    top: isMobile ? "auto" : 0,
+                    right: isMobile ? "auto" : 0,
+                    zIndex:5,
+                    width: isMobile ? "100%" : "260px",
+                    marginBottom: isMobile ? "12px" : 0
+                  }}>
                     <DrillTimer
                       duration={currentDrillTimeSafe}
                       resetKey={viewDrill}
@@ -664,9 +683,9 @@ function App() {
 
         {/* ===== CIRCUITS TAB ===== */}
         {tab === "circuits" && (
-          <div style={{display:"flex", gap:"20px"}}>
+          <div style={{display:"flex", gap:"20px", flexDirection:isMobile ? "column" : "row"}}>
             {/* Left sidebar */}
-            <div style={{width:"300px", flexShrink:0}}>
+            <div style={{width:isMobile ? "100%" : "300px", flexShrink:0}}>
               {admin ? (
                 /* Admin: category filter + exercise list + settings */
                 <>
@@ -677,20 +696,20 @@ function App() {
                   </div>
 
                   <div style={{background:BH.white, borderRadius:"8px", border:`1px solid ${BH.g300}`,
-                               maxHeight:"350px", overflowY:"auto"}}>
+                               maxHeight:isSmall ? "260px" : "350px", overflowY:"auto"}}>
                     <div style={{padding:"12px 14px", borderBottom:`1px solid ${BH.g200}`,
                                  fontSize:"13px", fontWeight:"bold", color:BH.navy}}>
                       Exercises
                     </div>
                     {filteredExercises.map(e => (
-                      <div key={e.id} style={{padding:"8px 14px", display:"flex", gap:"8px", alignItems:"center",
+                      <div key={e.id} style={{padding:isSmall ? "10px 14px" : "8px 14px", display:"flex", gap:"8px", alignItems:"center",
                         cursor:"pointer", borderBottom:`1px solid ${BH.g100}`}}
                         onClick={() => toggleExercise(e.id)}>
                         <input type="checkbox" checked={selExercises.includes(e.id)}
-                          onChange={() => {}} style={{cursor:"pointer", accentColor:BH.navy}}/>
+                          onChange={() => {}} style={{cursor:"pointer", accentColor:BH.navy, transform:isSmall ? "scale(1.1)" : "none"}}/>
                         <div style={{flex:1}}>
-                          <div style={{fontSize:"12px", fontWeight:"bold", color:BH.navy}}>{e.name}</div>
-                          <div style={{fontSize:"10px", color:BH.g500}}>{e.cat} • {e.reps}</div>
+                          <div style={{fontSize:isSmall ? "13px" : "12px", fontWeight:"bold", color:BH.navy}}>{e.name}</div>
+                          <div style={{fontSize:isSmall ? "11px" : "10px", color:BH.g500}}>{e.cat} • {e.reps}</div>
                         </div>
                       </div>
                     ))}

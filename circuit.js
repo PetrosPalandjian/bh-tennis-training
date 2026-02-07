@@ -20,10 +20,11 @@ function CircuitRing({stations, selectedIdx, onSelect, onRemove}) {
     </div>
   );
 
-  const size = 520, cx = size/2, cy = size/2;
-  const rad = 200;
-  const nr = 48;
-  const fs = 11;
+  const size = Math.max(320, Math.min(520, (typeof window !== "undefined" ? window.innerWidth : 520) - 40));
+  const cx = size / 2, cy = size / 2;
+  const rad = size * 0.385;
+  const nr = size * 0.092;
+  const fs = size < 420 ? 10 : 11;
 
   // Helper to wrap text into multiple lines
   function wrapText(text, maxLen) {
@@ -43,7 +44,7 @@ function CircuitRing({stations, selectedIdx, onSelect, onRemove}) {
   }
 
   return (
-    <svg width={size} height={size} style={{display:"block", margin:"0 auto"}}>
+    <svg width={size} height={size} style={{display:"block", margin:"0 auto", maxWidth:"100%"}}>
       {/* Connecting ring */}
       <circle cx={cx} cy={cy} r={rad} fill="none" stroke={BH.g300} strokeWidth={1} strokeDasharray="4,3"/>
 
