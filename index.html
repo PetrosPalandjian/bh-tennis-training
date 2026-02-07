@@ -111,8 +111,12 @@ const DRILLS=[
     desc:"Confirm a neutral continental grip before accelerating.",
     tips:["Continental grip","Relax the hand","Check the V lines"],
     youtubeId:"QiVszYWaIO0",youtubeStart:285,youtubeEnd:310,courtType:"singles",
-    players:[{id:"S",x:55,y:98,color:BH.shotBlue},{id:"R",x:50,y:5,color:BH.shotRed}],
-    steps:[{t:"hit",f:[55,98],to:[50,25],c:BH.shotBlue,n:"1",shot:"serve",hitter:"S",note:"Grip check"}]
+    players:[{id:"S",x:50,y:52,color:BH.shotBlue}],
+    steps:[
+      {t:"move",f:[50,52],to:[50,52],c:BH.shotBlue,note:"Trophy position (racquet up, ready)"},
+      {t:"move",f:[50,52],to:[50,52],c:BH.shotBlue,note:"Toss the ball"},
+      {t:"hit",f:[50,52],to:[50,25],c:BH.shotBlue,n:"1",shot:"serve",hitter:"S",note:"Contact at full extension, stop at contact"}
+    ]
   },
   {
     id:"sv-stance",name:"Serve Stance Setup",cat:"Skill Focus",diff:"Beginner",skill:"Serve",
@@ -127,8 +131,13 @@ const DRILLS=[
     desc:"Groove a consistent toss placement before contact.",
     tips:["Same release every time","Toss to target","Hold finish"],
     youtubeId:"QiVszYWaIO0",youtubeStart:363,youtubeEnd:426,courtType:"singles",
-    players:[{id:"S",x:55,y:98,color:BH.shotBlue},{id:"R",x:50,y:5,color:BH.shotRed}],
-    steps:[{t:"hit",f:[55,98],to:[50,22],c:BH.shotBlue,n:"1",shot:"serve",hitter:"S",note:"Toss target"}]
+    players:[{id:"S",x:56,y:68,color:BH.shotBlue}],
+    steps:[
+      {t:"move",f:[56,68],to:[56,68],c:BH.shotBlue,note:"Trophy position at service line"},
+      {t:"move",f:[56,68],to:[56,68],c:BH.shotBlue,note:"Toss the ball"},
+      {t:"hit",f:[56,68],to:[50,28],c:BH.shotBlue,n:"1",shot:"serve",hitter:"S",note:"Contact + full pronation"},
+      {t:"move",f:[56,68],to:[56,68],c:BH.shotBlue,note:"Finish balanced, racquet to opposite quad"}
+    ]
   },
   {
     id:"sv-contact",name:"Serve Contact & Pronation",cat:"Skill Focus",diff:"Intermediate",skill:"Serve",
