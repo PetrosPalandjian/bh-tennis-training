@@ -151,7 +151,7 @@ function DrillViewer({drill}) {
 }
 
 // DrillTimer Component
-function DrillTimer({duration, resetKey, onNext, canNext}) {
+function DrillTimer({duration, resetKey, onNext, canNext, onToggle, toggleLabel}) {
   const [running, setRunning] = React.useState(false);
   const [timeLeft, setTimeLeft] = React.useState(duration);
   const tmr = React.useRef(null);
@@ -200,9 +200,17 @@ function DrillTimer({duration, resetKey, onNext, canNext}) {
 
   return (
     <div style={{background:BH.white, border:`1px solid ${BH.g300}`, borderRadius:"8px", padding:"12px 14px", marginBottom:"10px"}}>
-      <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"8px"}}>
+      <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"8px", gap:"8px"}}>
         <div style={{fontSize:"12px", fontWeight:"bold", color:BH.navy}}>Drill Timer</div>
-        <div style={{fontSize:"18px", fontWeight:"bold", color:BH.maroon}}>{mm}:{ss}</div>
+        <div style={{display:"flex", alignItems:"center", gap:"8px"}}>
+          <div style={{fontSize:"18px", fontWeight:"bold", color:BH.maroon}}>{mm}:{ss}</div>
+          {onToggle && (
+            <button onClick={onToggle} style={{
+              padding:"4px 8px", background:BH.g200, color:BH.navy, border:`1px solid ${BH.g300}`,
+              borderRadius:"6px", cursor:"pointer", fontSize:"10px", fontWeight:"bold"
+            }}>{toggleLabel || "Hide"}</button>
+          )}
+        </div>
       </div>
       <div style={{display:"flex", gap:"8px", flexWrap:"wrap"}}>
         <button onClick={() => setRunning(r => !r)} style={btn(running ? BH.shotRed : BH.shotBlue)}>
@@ -300,9 +308,7 @@ function App() {
   const [drSkill, setDrSkill] = React.useState("All");
   const [exCat, setExCat] = React.useState("All");
   const [viewDrill, setViewDrill] = React.useState(null);
-  const [practiceMode, setPracticeMode] = React.useState(false);
   const [showDrillTimer, setShowDrillTimer] = React.useState(true);
-  const [pmIdx, setPmIdx] = React.useState(0);
   const [toast, setToast] = React.useState("");
   const [circuitStIdx, setCircuitStIdx] = React.useState(-1);
 
@@ -430,13 +436,17 @@ function App() {
   const currentViewDrill = viewDrill ? DRILLS.find(d => d.id === viewDrill) : null;
 
   // Practice mode drill
-  const pmDrills = admin
-    ? selDrills.map(d => {
-        const drill = DRILLS.find(x => x.id === d.id);
-        return drill ? { drill, time: d.time } : null;
-      }).filter(Boolean)
-    : playerDrills;
-  const pmDrill = pmDrills[pmIdx];
+  const orderedDrillIds = admin ? selDrills.map(d => d.id) : pubDrills.map(d => d.id);
+  const currentDrillTime = admin
+    ? (selDrills.find(d => d.id === viewDrill) || {}).time
+    : (pubDrills.find(d => d.id === viewDrill) || {}).time;
+  const currentDrillTimeSafe = typeof currentDrillTime === "number" ? currentDrillTime : drillTime;
+  const currentDrillIdx = viewDrill ? orderedDrillIds.indexOf(viewDrill) : -1;
+  const canNextDrill = currentDrillIdx >= 0 && currentDrillIdx < orderedDrillIds.length - 1;
+  const goNextDrill = () => {
+    if (!canNextDrill) return;
+    setViewDrill(orderedDrillIds[currentDrillIdx + 1]);
+  };
 
   // Admin's selected exercises for circuit
   const adminExercises = selExercises.map(id => EXERCISES.find(e => e.id === id)).filter(Boolean);
@@ -502,10 +512,10 @@ function App() {
       {/* Tab bar */}
       <div style={{display:"flex", justifyContent:"center", gap:"12px", padding:"16px",
                    background:BH.white, borderBottom:`1px solid ${BH.g300}`}}>
-        <button onClick={() => { setTab("circuits"); setPracticeMode(false); }} style={tabBtn(tab==="circuits")}>
+        <button onClick={() => { setTab("circuits"); }} style={tabBtn(tab==="circuits")}>
           Circuits
         </button>
-        <button onClick={() => { setTab("drills"); setPracticeMode(false); }} style={tabBtn(tab==="drills")}>
+        <button onClick={() => { setTab("drills"); }} style={tabBtn(tab==="drills")}>
           Drills
         </button>
       </div>
@@ -525,50 +535,8 @@ function App() {
 
         {/* ===== DRILLS TAB ===== */}
         {tab === "drills" && (
-          practiceMode && pmDrills.length > 0 ? (
-            /* Practice Mode */
-            <div>
-              <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"16px"}}>
-                <button onClick={() => setPracticeMode(false)} style={{padding:"8px 16px", background:BH.navy,
-                  color:BH.white, border:"none", borderRadius:"6px", cursor:"pointer", fontSize:"13px"}}>
-                  ← Back to Plan
-                </button>
-                <div style={{fontSize:"13px", color:BH.g700, fontWeight:"bold"}}>
-                  Drill {pmIdx+1} of {pmDrills.length}: {pmDrill && pmDrill.drill && pmDrill.drill.name}
-                </div>
-              </div>
-              {showDrillTimer && pmDrill && (
-                <DrillTimer
-                  duration={pmDrill.time}
-                  resetKey={pmDrill.drill && pmDrill.drill.id}
-                  onNext={() => setPmIdx(Math.min(pmDrills.length-1, pmIdx+1))}
-                  canNext={pmIdx < pmDrills.length - 1}
-                />
-              )}
-              <div style={{display:"flex", justifyContent:"flex-end", marginBottom:"12px"}}>
-                <button onClick={() => setShowDrillTimer(v => !v)} style={{
-                  padding:"6px 10px", background:BH.g200, color:BH.navy, border:`1px solid ${BH.g300}`,
-                  borderRadius:"6px", cursor:"pointer", fontSize:"12px", fontWeight:"bold"
-                }}>
-                  {showDrillTimer ? "Hide Timer" : "Show Timer"}
-                </button>
-              </div>
-              {pmDrill && <DrillViewer drill={pmDrill.drill}/>}
-              <div style={{display:"flex", gap:"8px", marginTop:"16px"}}>
-                <button onClick={() => setPmIdx(Math.max(0, pmIdx-1))} disabled={pmIdx<=0}
-                  style={{flex:1, padding:"12px", background:pmIdx<=0?BH.g300:BH.navy, color:BH.white,
-                    border:"none", borderRadius:"6px", cursor:"pointer", fontSize:"14px", fontWeight:"bold"}}>
-                  ← Previous Drill
-                </button>
-                <button onClick={() => setPmIdx(Math.min(pmDrills.length-1, pmIdx+1))} disabled={pmIdx>=pmDrills.length-1}
-                  style={{flex:1, padding:"12px", background:pmIdx>=pmDrills.length-1?BH.g300:BH.navy, color:BH.white,
-                    border:"none", borderRadius:"6px", cursor:"pointer", fontSize:"14px", fontWeight:"bold"}}>
-                  Next Drill →
-                </button>
-              </div>
-            </div>
-          ) : (
-            /* Normal Drills View */
+          (
+            /* Drills View */
             <div style={{display:"flex", gap:"20px"}}>
               {/* Left sidebar */}
               <div style={{width:"300px", flexShrink:0}}>
@@ -647,18 +615,6 @@ function App() {
                       </div>
                     </div>
 
-                    {/* Drill timer setting */}
-                    <div style={{background:BH.white, borderRadius:"8px", border:`1px solid ${BH.g300}`,
-                                 marginTop:"16px", padding:"14px"}}>
-                      <div style={{fontSize:"13px", fontWeight:"bold", color:BH.navy, marginBottom:"10px"}}>
-                        Drill Timer
-                      </div>
-                      <label style={{fontSize:"12px", color:BH.g700, display:"flex", justifyContent:"space-between", alignItems:"center"}}>
-                        Duration (sec)
-                        <input type="number" value={drillTime} onChange={e => setDrillTime(+e.target.value)}
-                          style={{width:"70px", padding:"4px 8px", border:`1px solid ${BH.g300}`, borderRadius:"4px"}} min="10" max="900"/>
-                      </label>
-                    </div>
                   </>
                 ) : (
                   /* Non-Admin: Today's Plan (read-only numbered list) */
@@ -668,11 +624,11 @@ function App() {
                       <div style={{fontSize:"11px", opacity:0.8}}>{playerDrills.length} drills</div>
                     </div>
                     <div style={{padding:"8px 0"}}>
-                      {playerDrills.length === 0 ? (
-                        <div style={{padding:"20px 16px", textAlign:"center", fontSize:"13px", color:BH.g500}}>
-                          No drills published yet. Check back later!
-                        </div>
-                      ) : (
+                    {playerDrills.length === 0 ? (
+                      <div style={{padding:"20px 16px", textAlign:"center", fontSize:"13px", color:BH.g500}}>
+                        No drills published yet. Check back later!
+                      </div>
+                    ) : (
                         playerDrills.map((item, i) => (
                           <div key={item.drill.id} onClick={() => setViewDrill(item.drill.id)}
                             style={{padding:"10px 16px", display:"flex", gap:"10px", alignItems:"center",
@@ -687,21 +643,24 @@ function App() {
                         ))
                       )}
                     </div>
-                    {playerDrills.length > 0 && (
-                      <div style={{padding:"12px 16px", borderTop:`1px solid ${BH.g200}`}}>
-                        <button onClick={() => { setPracticeMode(true); setPmIdx(0); }}
-                          style={{width:"100%", padding:"12px", background:BH.navy, color:BH.white,
-                            border:"none", borderRadius:"6px", cursor:"pointer", fontSize:"14px", fontWeight:"bold"}}>
-                          ▶ Practice Mode
-                        </button>
-                      </div>
-                    )}
                   </div>
                 )}
               </div>
 
               {/* Right: Drill Viewer */}
-              <div style={{flex:1, minWidth:0}}>
+              <div style={{flex:1, minWidth:0, position:"relative"}}>
+                {showDrillTimer && viewDrill && (
+                  <div style={{position:"absolute", top:0, right:0, zIndex:5, width:"260px"}}>
+                    <DrillTimer
+                      duration={currentDrillTimeSafe}
+                      resetKey={viewDrill}
+                      onNext={goNextDrill}
+                      canNext={canNextDrill}
+                      onToggle={() => setShowDrillTimer(false)}
+                      toggleLabel="Hide"
+                    />
+                  </div>
+                )}
                 {currentViewDrill ? (
                   <DrillViewer drill={currentViewDrill}/>
                 ) : (
@@ -900,9 +859,17 @@ function App() {
                               allowFullScreen style={{position:"absolute", top:0, left:0, width:"100%", height:"100%"}}/>
                           </div>
                         </div>
-                      )}
-                    </div>
-                  )}
+                    )}
+                    {!showDrillTimer && (
+                      <div style={{padding:"10px 16px", borderTop:`1px solid ${BH.g200}`, textAlign:"center"}}>
+                        <button onClick={() => setShowDrillTimer(true)} style={{
+                          padding:"6px 12px", background:BH.g200, color:BH.navy, border:`1px solid ${BH.g300}`,
+                          borderRadius:"6px", cursor:"pointer", fontSize:"12px", fontWeight:"bold"
+                        }}>Show Timer</button>
+                      </div>
+                    )}
+                  </div>
+                )}
                 </>
               )}
             </div>
