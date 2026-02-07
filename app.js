@@ -323,8 +323,9 @@ function App() {
                       justifyContent:"space-between", alignItems:"center",
                       boxShadow:"0 2px 8px rgba(0,0,0,0.15)"}}>
         <div>
-          <div style={{fontSize:"18px", fontWeight:"bold", color:BH.maroon, letterSpacing:"1px"}}>BELMONT HILL</div>
-          <div style={{fontSize:"12px", opacity:0.85}}>Varsity Tennis Training</div>
+          <div style={{fontSize:"20px", fontWeight:"normal", color:BH.white, letterSpacing:"3.5px",
+                      fontFamily:"Georgia, 'Times New Roman', serif"}}>BELMONT HILL</div>
+          <div style={{fontSize:"12px", opacity:0.85, letterSpacing:"1px"}}>Varsity Tennis</div>
         </div>
         <div style={{display:"flex", gap:"12px", alignItems:"center"}}>
           {admin ? (
@@ -352,11 +353,11 @@ function App() {
       {/* Tab bar */}
       <div style={{display:"flex", justifyContent:"center", gap:"12px", padding:"16px",
                    background:BH.white, borderBottom:`1px solid ${BH.g300}`}}>
-        <button onClick={() => { setTab("drills"); setPracticeMode(false); }} style={tabBtn(tab==="drills")}>
-          Drills
-        </button>
         <button onClick={() => { setTab("circuits"); setPracticeMode(false); }} style={tabBtn(tab==="circuits")}>
           Circuits
+        </button>
+        <button onClick={() => { setTab("drills"); setPracticeMode(false); }} style={tabBtn(tab==="drills")}>
+          Drills
         </button>
       </div>
 
