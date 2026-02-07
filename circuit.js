@@ -73,7 +73,7 @@ function CircuitRing({stations, selectedIdx, onSelect, onRemove}) {
             <circle cx={x} cy={y} r={nr} fill={fillCol} stroke={strokeCol} strokeWidth={strokeW}/>
 
             {/* Station number above */}
-            <text x={x} y={y - nr - 8} textAnchor="middle" fontSize="12" fontWeight="bold"
+            <text x={x} y={y - nr + 4} textAnchor="middle" fontSize="12" fontWeight="bold"
                   fill={BH.navy} style={{pointerEvents:"none"}}>
               {stationNum}
             </text>
