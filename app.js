@@ -214,7 +214,6 @@ function App() {
   const [selExercises, setSelExercises] = React.useState([]);
 
   // UI state
-  const [drCat, setDrCat] = React.useState("All");
   const [drSkill, setDrSkill] = React.useState("All");
   const [exCat, setExCat] = React.useState("All");
   const [viewDrill, setViewDrill] = React.useState(null);
@@ -275,7 +274,6 @@ function App() {
 
   // Filtered lists for admin category browsing
   const filteredDrills = DRILLS.filter(d =>
-    (drCat === "All" || d.cat === drCat) &&
     (drSkill === "All" || d.skill === drSkill)
   );
   const filteredExercises = exCat === "All" ? EXERCISES : EXERCISES.filter(e => e.cat === exCat);
@@ -416,16 +414,9 @@ function App() {
                   /* Admin: category filter + drill list with checkboxes + today's plan summary */
                   <>
                     {/* Skill filter */}
-                    <div style={{display:"flex", flexWrap:"wrap", gap:"6px", marginBottom:"10px"}}>
+                    <div style={{display:"flex", flexWrap:"wrap", gap:"6px", marginBottom:"16px"}}>
                       {DRILL_SKILLS.map(s => (
                         <button key={s} onClick={() => setDrSkill(s)} style={catBtn(drSkill===s)}>{s}</button>
-                      ))}
-                    </div>
-
-                    {/* Category filter */}
-                    <div style={{display:"flex", flexWrap:"wrap", gap:"6px", marginBottom:"16px"}}>
-                      {DRILL_CATS.map(c => (
-                        <button key={c} onClick={() => setDrCat(c)} style={catBtn(drCat===c)}>{c}</button>
                       ))}
                     </div>
 
