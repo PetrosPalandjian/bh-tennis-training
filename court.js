@@ -2,53 +2,71 @@
 // Loaded via <script type="text/babel"> - uses global variables from data.js
 
 /**
- * Tennis Player Silhouette Paths (side-view, centered at origin)
- * Each path is 30-36 units tall, showing body, legs, arm with racquet
- * "near" position faces up, "far" position is flipped vertically
+ * Shot Type Abbreviations & Colors
+ * Used as badges on player markers, Sportplan-style
  */
-const PLAYER_PATHS = {
-  ready: "M-3,-14 Q-5,-10 -4,-4 L-6,-2 L-6,8 M3,-14 Q5,-10 4,-4 L6,-2 L6,8 M-3,-14 L3,-14 L2,-8 L-2,-8 Z M-2,-6 Q-4,-5 -5,2 M2,-6 Q4,-5 5,2",
-
-  forehand: "M-4,-14 Q-6,-10 -5,-4 L-8,-2 L-8,10 M2,-14 Q3,-10 2,-2 L4,1 L4,10 M-4,-14 L2,-14 L1,-8 L-3,-8 Z M1,-5 L8,-8 L11,-12 Q12,-14 10,-14 L8,-12 Z",
-
-  backhand: "M-2,-14 Q-3,-10 -2,-2 L-4,1 L-4,10 M4,-14 Q6,-10 5,-4 L8,-2 L8,10 M-2,-14 L4,-14 L3,-8 L-1,-8 Z M-1,-5 L-8,-8 L-11,-12 Q-12,-14 -10,-14 L-8,-12 Z",
-
-  serve: "M-3,-14 Q-5,-9 -4,-2 L-7,2 L-7,10 M3,-14 Q5,-9 4,-2 L5,4 L5,10 M-3,-14 L3,-14 L1,-8 L-1,-8 Z M3,-4 L6,-14 L9,-16 Q10,-17 9,-18 L7,-16 Z",
-
-  fh_volley: "M-3,-12 Q-5,-8 -4,0 L-6,2 L-6,8 M3,-12 Q4,-8 3,0 L5,2 L5,8 M-3,-12 L3,-12 L2,-6 L-2,-6 Z M2,-4 L7,-6 L9,-10 Q9,-12 7,-11 L6,-8 Z",
-
-  bh_volley: "M-3,-12 Q-4,-8 -3,0 L-5,2 L-5,8 M3,-12 Q5,-8 4,0 L6,2 L6,8 M-3,-12 L3,-12 L2,-6 L-2,-6 Z M-2,-4 L-7,-6 L-9,-10 Q-9,-12 -7,-11 L-6,-8 Z",
-
-  overhead: "M-3,-14 Q-5,-9 -4,-1 L-7,2 L-7,10 M3,-14 Q5,-9 4,-1 L5,3 L5,10 M-3,-14 L3,-14 L1,-7 L-1,-7 Z M3,-3 L8,-14 L10,-18 Q11,-19 10,-20 L8,-17 Z",
-
-  slice_fh: "M-3,-14 Q-5,-10 -4,-3 L-7,0 L-7,8 M3,-14 Q4,-10 3,-3 L5,1 L5,8 M-3,-14 L3,-14 L1,-8 L-1,-8 Z M2,-1 L8,-1 L10,-3 Q11,-4 10,-5 L8,-4 Z",
-
-  slice_bh: "M-3,-14 Q-4,-10 -3,-3 L-5,1 L-5,8 M3,-14 Q5,-10 4,-3 L7,0 L7,8 M-3,-14 L3,-14 L1,-8 L-1,-8 Z M-2,-1 L-8,-1 L-10,-3 Q-11,-4 -10,-5 L-8,-4 Z"
+const SHOT_INFO = {
+  forehand:  { abbr: "FH", icon: "→" },
+  backhand:  { abbr: "BH", icon: "←" },
+  serve:     { abbr: "SV", icon: "↑" },
+  fh_volley: { abbr: "FV", icon: "⤴" },
+  bh_volley: { abbr: "BV", icon: "⤵" },
+  overhead:  { abbr: "OH", icon: "⬆" },
+  slice_fh:  { abbr: "SF", icon: "↗" },
+  slice_bh:  { abbr: "SB", icon: "↖" },
 };
 
 /**
- * PlayerIcon Component
- * Bird's-eye view player icon with shot-type silhouettes
- * Renders with team color fill, white strokes, and player label
+ * PlayerIcon Component — Sportplan-style clean marker
+ *
+ * Design: Colored circle with player letter in center,
+ * small shot-type badge offset to the side when active.
+ * Clean, readable on iPad screens at any size.
  */
 function PlayerIcon({px, py, color, label, shot, courtY}) {
-  // Determine if player is on "far" side (top of court, looking away)
   const isFar = courtY < 50;
-  const scaleY = isFar ? -1 : 1;
+  const info = shot ? SHOT_INFO[shot] : null;
 
-  // Get the silhouette path for this shot type
-  const pathKey = shot ? shot : "ready";
-  const pathD = PLAYER_PATHS[pathKey] || PLAYER_PATHS.ready;
+  // Main circle radius
+  const r = 16;
+  // Badge offset direction (show badge toward center of court for readability)
+  const badgeX = 14;
+  const badgeY = isFar ? 14 : -14;
 
   return (
-    <g transform={`translate(${px},${py})`}>
-      {/* Player silhouette */}
-      <path d={pathD} fill={color} stroke={BH.white} strokeWidth={1.8}
-            transform={`scale(1,${scaleY})`} strokeLinejoin="round" strokeLinecap="round"/>
+    <g style={{transform:`translate(${px}px,${py}px)`, transition:"transform 0.4s ease-in-out"}}>
+      {/* Drop shadow for depth */}
+      <circle cx={1} cy={2} r={r} fill="rgba(0,0,0,0.25)"/>
 
-      {/* Player label positioned below/above silhouette */}
-      <text x={0} y={isFar ? -20 : 20} textAnchor="middle" dominantBaseline="middle"
-            fontSize="11" fontWeight="800" fill={BH.white}>{label}</text>
+      {/* Main player circle */}
+      <circle cx={0} cy={0} r={r} fill={color} stroke={BH.white} strokeWidth={2.5}/>
+
+      {/* Player label (letter) centered */}
+      <text x={0} y={1} textAnchor="middle" dominantBaseline="middle"
+            fontSize="14" fontWeight="900" fill={BH.white}
+            style={{letterSpacing:"0.5px"}}>{label}</text>
+
+      {/* Shot-type badge when active */}
+      {info && (
+        <g>
+          <rect x={badgeX - 13} y={badgeY - 7} width={26} height={14}
+                rx={3} fill={BH.navy} stroke={BH.white} strokeWidth={1.2}/>
+          <text x={badgeX} y={badgeY + 1} textAnchor="middle" dominantBaseline="middle"
+                fontSize="8" fontWeight="bold" fill={BH.gold}
+                style={{letterSpacing:"0.5px"}}>{info.abbr}</text>
+        </g>
+      )}
+
+      {/* Direction indicator - small arrow showing facing direction */}
+      {!info && (
+        <g>
+          {isFar ? (
+            <polygon points="-4,-20 4,-20 0,-25" fill={color} stroke={BH.white} strokeWidth={1} opacity={0.7}/>
+          ) : (
+            <polygon points="-4,20 4,20 0,25" fill={color} stroke={BH.white} strokeWidth={1} opacity={0.7}/>
+          )}
+        </g>
+      )}
     </g>
   );
 }
@@ -57,6 +75,7 @@ function PlayerIcon({px, py, color, label, shot, courtY}) {
  * Court Component
  * Renders full tennis court SVG with white lines, service boxes, net, and overlays
  * Displays shot arrows and player icons
+ * Now includes smooth animated transitions via SVG <animate> elements
  */
 function Court({courtType, players, steps, activeStep, showAll}) {
   const L = CRT.PAD, R = CRT.W - CRT.PAD, T = CRT.PAD, B = CRT.H - CRT.PAD;
@@ -74,14 +93,14 @@ function Court({courtType, players, steps, activeStep, showAll}) {
     const x1 = mX(s.f[0]), y1 = mY(s.f[1]);
     const x2 = mX(s.to[0]), y2 = mY(s.to[1]);
     const isActive = i === activeStep;
-    const op = isActive ? 1 : 0.4;
-    const sw = isActive ? 3 : 2;
+    const op = isActive ? 1 : 0.35;
+    const sw = isActive ? 3 : 1.8;
     const col = s.c || BH.shotBlue;
     const dashArr = s.t === "move" ? "6,4" : "none";
     const markerId = `ah${i}`;
 
     return (
-      <g key={i} opacity={op}>
+      <g key={i} opacity={op} style={{transition:"opacity 0.3s ease"}}>
         <defs>
           <marker id={markerId} markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
             <path d="M0,0 L10,4 L0,8 Z" fill={col}/>
@@ -89,6 +108,7 @@ function Court({courtType, players, steps, activeStep, showAll}) {
         </defs>
         <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={col} strokeWidth={sw}
               markerEnd={`url(#${markerId})`} strokeDasharray={dashArr}/>
+        {/* Step number badge on arrow midpoint */}
         {s.t === "hit" && s.n && (
           <g>
             <circle cx={(x1+x2)/2} cy={(y1+y2)/2} r={10} fill={BH.navy} stroke={BH.white} strokeWidth={1.5}/>
@@ -96,6 +116,7 @@ function Court({courtType, players, steps, activeStep, showAll}) {
                   fontSize="9" fontWeight="bold" fill={BH.white}>{s.n}</text>
           </g>
         )}
+        {/* Note label on active arrow */}
         {s.note && isActive && (
           <text x={(x1+x2)/2} y={(y1+y2)/2 - 16} textAnchor="middle"
                 fontSize="9" fontWeight="bold" fill={BH.navy}

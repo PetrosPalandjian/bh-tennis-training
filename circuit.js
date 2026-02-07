@@ -12,7 +12,7 @@
  * Renders stations in a circle with dynamic sizing based on number of stations
  * All stations are same color (navy). Selected station gets subtle highlight.
  */
-function CircuitRing({stations, selectedIdx, onSelect}) {
+function CircuitRing({stations, selectedIdx, onSelect, onRemove}) {
   const n = stations.length;
   if (n === 0) return (
     <div style={{textAlign:"center", padding:"60px 20px", color:BH.g500, fontSize:"15px"}}>
@@ -111,6 +111,18 @@ function CircuitRing({stations, selectedIdx, onSelect}) {
             {/* Reps/sets info below */}
             <text x={x} y={y + nr + 12} textAnchor="middle" fontSize="9"
                   fill={BH.g500} style={{pointerEvents:"none"}}>{s.reps || ""}</text>
+
+            {/* Remove button (admin only) */}
+            {onRemove && (
+              <g style={{cursor:"pointer"}}
+                 onClick={(e) => { e.stopPropagation(); onRemove(i); }}>
+                <circle cx={x + nr * 0.7} cy={y - nr * 0.7} r={10}
+                        fill={BH.shotRed || "#E74C3C"} stroke={BH.white} strokeWidth={1.5}/>
+                <text x={x + nr * 0.7} y={y - nr * 0.7 + 1} textAnchor="middle"
+                      dominantBaseline="middle" fontSize="13" fontWeight="bold"
+                      fill={BH.white} style={{pointerEvents:"none"}}>×</text>
+              </g>
+            )}
           </g>
         );
       })}

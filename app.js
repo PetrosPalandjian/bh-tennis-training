@@ -126,11 +126,20 @@ function DrillViewer({drill}) {
         </div>
       )}
 
-      {/* YouTube embed */}
+      {/* YouTube embed with timestamp support */}
       {drill.youtubeId && (
         <div style={{borderRadius:"8px", overflow:"hidden", border:`1px solid ${BH.g300}`}}>
+          <div style={{padding:"8px 12px", background:BH.navy, display:"flex", alignItems:"center", gap:"8px"}}>
+            <span style={{fontSize:"12px", fontWeight:"bold", color:BH.white}}>Video Demo</span>
+            {(drill.youtubeStart || drill.youtubeEnd) && (
+              <span style={{fontSize:"10px", color:BH.gold, opacity:0.8}}>
+                {drill.youtubeStart ? `from ${Math.floor(drill.youtubeStart/60)}:${String(drill.youtubeStart%60).padStart(2,"0")}` : ""}
+                {drill.youtubeEnd ? ` to ${Math.floor(drill.youtubeEnd/60)}:${String(drill.youtubeEnd%60).padStart(2,"0")}` : ""}
+              </span>
+            )}
+          </div>
           <iframe width="100%" height="220"
-            src={`https://www.youtube.com/embed/${drill.youtubeId}`}
+            src={`https://www.youtube.com/embed/${drill.youtubeId}?${drill.youtubeStart ? "start="+drill.youtubeStart : ""}${drill.youtubeEnd ? "&end="+drill.youtubeEnd : ""}&rel=0&modestbranding=1`}
             frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope"
             allowFullScreen style={{display:"block"}}/>
         </div>
@@ -658,7 +667,15 @@ function App() {
               ) : (
                 <>
                   <CircuitRing stations={circuitExercises} selectedIdx={circuitStIdx}
-                    onSelect={(i) => setCircuitStIdx(i)}/>
+                    onSelect={(i) => setCircuitStIdx(i)}
+                    onRemove={admin ? (i) => {
+                      const id = circuitExercises[i] && circuitExercises[i].id;
+                      if (id) {
+                        setSelExercises(sel => sel.filter(x => x !== id));
+                        if (circuitStIdx === i) setCircuitStIdx(-1);
+                        else if (circuitStIdx > i) setCircuitStIdx(circuitStIdx - 1);
+                      }
+                    } : null}/>
                   {/* Selected exercise detail card */}
                   {circuitStIdx >= 0 && circuitStIdx < circuitExercises.length && (
                     <div style={{background:BH.white, padding:"16px", borderRadius:"8px", border:`2px solid ${BH.gold}`, marginTop:"16px", textAlign:"center"}}>
