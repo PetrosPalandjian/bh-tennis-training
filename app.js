@@ -313,16 +313,29 @@ function App() {
     if (h.startsWith("config=")) {
       try { cfg = JSON.parse(atob(h.slice(7))); } catch(e) {}
     }
+    const normalizeDrills = (drills, defaultTime) => {
+      if (!Array.isArray(drills)) return [];
+      if (drills.length === 0) return [];
+      if (typeof drills[0] === "string") {
+        return drills.map(id => ({ id, time: defaultTime || 90 }));
+      }
+      return drills.map(d => ({
+        id: d.id,
+        time: typeof d.time === "number" ? d.time : (defaultTime || 90)
+      }));
+    };
     const applyCfg = (c) => {
       if (!c) return;
-      setPubDrills(c.drills || []);
+      const defaultTime = c.drillTime || 90;
+      const normDrills = normalizeDrills(c.drills || [], defaultTime);
+      setPubDrills(normDrills);
       setPubExercises(c.exercises || []);
-      setSelDrills(c.drills || []);
+      setSelDrills(normDrills);
       setSelExercises(c.exercises || []);
       setWork(c.work || 45);
       setRest(c.rest || 15);
       setRounds(c.rounds || 3);
-      setDrillTime(c.drillTime || 90);
+      setDrillTime(defaultTime);
     };
     const loadFromSupabase = async () => {
       const res = await sbRest("published_plan?select=data&id=eq.1", { method: "GET" });
@@ -386,7 +399,11 @@ function App() {
 
   // Toggle drill selection (admin)
   const toggleDrill = (id) => {
-    setSelDrills(sel => sel.includes(id) ? sel.filter(x => x !== id) : [...sel, id]);
+    setSelDrills(sel => {
+      const exists = sel.find(d => d.id === id);
+      if (exists) return sel.filter(d => d.id !== id);
+      return [...sel, { id, time: drillTime }];
+    });
   };
 
   // Toggle exercise selection (admin)
@@ -401,7 +418,10 @@ function App() {
   const filteredExercises = exCat === "All" ? EXERCISES : EXERCISES.filter(e => e.cat === exCat);
 
   // The drill list that non-admin players see (only published drills, in order)
-  const playerDrills = pubDrills.map(id => DRILLS.find(d => d.id === id)).filter(Boolean);
+  const playerDrills = pubDrills.map(d => {
+    const drill = DRILLS.find(x => x.id === d.id);
+    return drill ? { drill, time: d.time } : null;
+  }).filter(Boolean);
 
   // The exercise list for non-admin
   const playerExercises = pubExercises.map(id => EXERCISES.find(e => e.id === id)).filter(Boolean);
@@ -410,7 +430,12 @@ function App() {
   const currentViewDrill = viewDrill ? DRILLS.find(d => d.id === viewDrill) : null;
 
   // Practice mode drill
-  const pmDrills = admin ? selDrills.map(id => DRILLS.find(d => d.id === id)).filter(Boolean) : playerDrills;
+  const pmDrills = admin
+    ? selDrills.map(d => {
+        const drill = DRILLS.find(x => x.id === d.id);
+        return drill ? { drill, time: d.time } : null;
+      }).filter(Boolean)
+    : playerDrills;
   const pmDrill = pmDrills[pmIdx];
 
   // Admin's selected exercises for circuit
@@ -509,13 +534,13 @@ function App() {
                   ← Back to Plan
                 </button>
                 <div style={{fontSize:"13px", color:BH.g700, fontWeight:"bold"}}>
-                  Drill {pmIdx+1} of {pmDrills.length}: {pmDrill && pmDrill.name}
+                  Drill {pmIdx+1} of {pmDrills.length}: {pmDrill && pmDrill.drill && pmDrill.drill.name}
                 </div>
               </div>
-              {showDrillTimer && (
+              {showDrillTimer && pmDrill && (
                 <DrillTimer
-                  duration={drillTime}
-                  resetKey={pmDrill && pmDrill.id}
+                  duration={pmDrill.time}
+                  resetKey={pmDrill.drill && pmDrill.drill.id}
                   onNext={() => setPmIdx(Math.min(pmDrills.length-1, pmIdx+1))}
                   canNext={pmIdx < pmDrills.length - 1}
                 />
@@ -528,7 +553,7 @@ function App() {
                   {showDrillTimer ? "Hide Timer" : "Show Timer"}
                 </button>
               </div>
-              {pmDrill && <DrillViewer drill={pmDrill}/>}
+              {pmDrill && <DrillViewer drill={pmDrill.drill}/>}
               <div style={{display:"flex", gap:"8px", marginTop:"16px"}}>
                 <button onClick={() => setPmIdx(Math.max(0, pmIdx-1))} disabled={pmIdx<=0}
                   style={{flex:1, padding:"12px", background:pmIdx<=0?BH.g300:BH.navy, color:BH.white,
@@ -570,7 +595,7 @@ function App() {
                           cursor:"pointer", borderBottom:`1px solid ${BH.g100}`,
                           background:viewDrill===d.id ? `rgba(59,130,246,0.08)` : "transparent"}}
                           onClick={() => setViewDrill(d.id)}>
-                          <input type="checkbox" checked={selDrills.includes(d.id)}
+                          <input type="checkbox" checked={selDrills.some(x => x.id === d.id)}
                             onChange={(e) => { e.stopPropagation(); toggleDrill(d.id); }}
                             style={{cursor:"pointer", accentColor:BH.navy}}/>
                           <div style={{flex:1}}>
@@ -594,15 +619,26 @@ function App() {
                             Check drills above to build today's plan
                           </div>
                         ) : (
-                          selDrills.map((id, i) => {
-                            const d = DRILLS.find(dr => dr.id === id);
+                          selDrills.map((entry, i) => {
+                            const d = DRILLS.find(dr => dr.id === entry.id);
                             if (!d) return null;
                             return (
-                              <div key={id} style={{display:"flex", gap:"8px", alignItems:"center", padding:"4px 0",
+                              <div key={entry.id} style={{display:"flex", gap:"8px", alignItems:"center", padding:"4px 0",
                                 borderBottom:i < selDrills.length-1 ? `1px solid ${BH.g100}` : "none"}}>
                                 <span style={{fontSize:"11px", fontWeight:"bold", color:BH.maroon, minWidth:"18px"}}>{i+1}.</span>
-                                <span style={{fontSize:"12px", color:BH.navy}}>{d.name}</span>
-                                <button onClick={() => toggleDrill(id)} style={{marginLeft:"auto", background:"none",
+                                <div style={{display:"flex", flexDirection:"column", gap:"2px"}}>
+                                  <span style={{fontSize:"12px", color:BH.navy}}>{d.name}</span>
+                                  <div style={{display:"flex", alignItems:"center", gap:"6px"}}>
+                                    <span style={{fontSize:"10px", color:BH.g500}}>Time (sec)</span>
+                                    <input type="number" value={entry.time}
+                                      onChange={(e) => {
+                                        const v = Math.max(10, Math.min(900, +e.target.value || 0));
+                                        setSelDrills(sel => sel.map(x => x.id === entry.id ? { ...x, time: v } : x));
+                                      }}
+                                      style={{width:"64px", padding:"2px 6px", border:`1px solid ${BH.g300}`, borderRadius:"4px", fontSize:"11px"}}/>
+                                  </div>
+                                </div>
+                                <button onClick={() => toggleDrill(entry.id)} style={{marginLeft:"auto", background:"none",
                                   border:"none", cursor:"pointer", fontSize:"14px", color:BH.g400, padding:"0 2px"}}>×</button>
                               </div>
                             );
@@ -637,15 +673,15 @@ function App() {
                           No drills published yet. Check back later!
                         </div>
                       ) : (
-                        playerDrills.map((d, i) => (
-                          <div key={d.id} onClick={() => setViewDrill(d.id)}
+                        playerDrills.map((item, i) => (
+                          <div key={item.drill.id} onClick={() => setViewDrill(item.drill.id)}
                             style={{padding:"10px 16px", display:"flex", gap:"10px", alignItems:"center",
                               cursor:"pointer", borderBottom:`1px solid ${BH.g100}`,
-                              background:viewDrill===d.id ? `rgba(201,162,39,0.12)` : "transparent"}}>
+                              background:viewDrill===item.drill.id ? `rgba(201,162,39,0.12)` : "transparent"}}>
                             <span style={{fontSize:"14px", fontWeight:"bold", color:BH.maroon, minWidth:"24px"}}>{i+1}</span>
                             <div>
-                              <div style={{fontSize:"13px", fontWeight:"bold", color:BH.navy}}>{d.name}</div>
-                              <div style={{fontSize:"11px", color:BH.g500}}>{d.desc}</div>
+                              <div style={{fontSize:"13px", fontWeight:"bold", color:BH.navy}}>{item.drill.name}</div>
+                              <div style={{fontSize:"11px", color:BH.g500}}>{item.drill.desc}</div>
                             </div>
                           </div>
                         ))
