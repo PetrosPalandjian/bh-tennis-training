@@ -17,11 +17,2059 @@
 </head>
 <body>
   <div id="root"></div>
-  <!-- Data file loads synchronously (no JSX, pure JS) -->
-  <script src="data.js"></script>
-  <!-- JSX components loaded via Babel -->
-  <script type="text/babel" src="court.js"></script>
-  <script type="text/babel" src="circuit.js"></script>
-  <script type="text/babel" src="app.js"></script>
+
+  <!-- Inlined to avoid file:// CORS issues with Babel fetching src -->
+  <script>
+const BH = {
+  navy:"#1B365D",navyLight:"#2C5282",navyDark:"#0F1F38",
+  maroon:"#7A1C2A",maroonLight:"#943548",maroonDim:"#5E1520",
+  white:"#FFF",offWhite:"#F7F8FA",
+  g100:"#F3F4F6",g200:"#E5E7EB",g300:"#D1D5DB",
+  g400:"#9CA3AF",g500:"#6B7280",g700:"#374151",g800:"#1F2937",
+  courtGreen:"#1B6B2B",courtDark:"#145220",
+  shotBlue:"#3B82F6",shotRed:"#EF4444",shotGold:"#F59E0B",
+};
+
+const CRT={W:400,H:760,PAD:30};
+const cw=CRT.W-2*CRT.PAD,ch=CRT.H-2*CRT.PAD;
+const mX=x=>CRT.PAD+(x/100)*cw;
+const mY=y=>CRT.PAD+(y/100)*ch;
+const SL={l:CRT.PAD+(4.5/36)*cw,r:CRT.W-CRT.PAD-(4.5/36)*cw};
+const NET_Y=mY(50);
+const SVC={far:NET_Y-(21/39)*(ch/2),near:NET_Y+(21/39)*(ch/2)};
+
+const POSES={
+  forehand:[9,-2,22,-10,-55],backhand:[-9,-2,-22,-10,55],
+  serve:[5,-6,8,-24,-10],fh_volley:[8,-4,18,-12,-45],bh_volley:[-8,-4,-18,-12,45],
+  overhead:[4,-5,6,-23,-5],slice_fh:[10,-1,20,-6,-65],slice_bh:[-10,-1,-20,-6,65],
+};
+const BODY_ROT={forehand:25,backhand:-25,serve:12,fh_volley:15,bh_volley:-15,overhead:10,slice_fh:20,slice_bh:-20};
+
+const beep=(freq,dur,vol=0.25)=>{try{const c=new(window.AudioContext||window.webkitAudioContext)(),o=c.createOscillator(),g=c.createGain();o.frequency.value=freq;o.type="sine";g.gain.setValueAtTime(vol,c.currentTime);g.gain.exponentialRampToValueAtTime(0.001,c.currentTime+dur/1000);o.connect(g);g.connect(c.destination);o.start();o.stop(c.currentTime+dur/1000)}catch(e){}};
+const snd={
+  go:()=>{beep(880,150);setTimeout(()=>beep(880,150),200);setTimeout(()=>beep(1100,250),400)},
+  rest:()=>beep(440,400,0.2),tick:()=>beep(660,80,0.15),
+  done:()=>{beep(523,120);setTimeout(()=>beep(659,120),160);setTimeout(()=>beep(784,120),320);setTimeout(()=>beep(1047,350),480)},
+};
+
+async function sha256(msg){const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(msg));return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');}
+
+const EXERCISES=[
+  {id:"russian-twist",name:"Russian Twists",cat:"Core",desc:"Seated twists with med ball. Feet off ground, rotate fully side to side.",reps:"20 reps",equip:"Med Ball 8-12lb"},
+  {id:"plank",name:"Plank Hold",cat:"Core",desc:"Forearm plank, tight core, hips level. Don't let hips sag.",reps:"45 sec",equip:"None"},
+  {id:"bicycle",name:"Bicycle Crunches",cat:"Core",desc:"Alternating elbow-to-knee crunches. Controlled, no yanking the neck.",reps:"20 each",equip:"None"},
+  {id:"dead-bug",name:"Dead Bugs",cat:"Core",desc:"Lying on back, extend opposite arm/leg while keeping low back flat.",reps:"10 each",equip:"None"},
+  {id:"v-ups",name:"V-Ups",cat:"Core",desc:"Simultaneously lift legs and torso to touch toes at the top.",reps:"15 reps",equip:"None"},
+  {id:"side-plank",name:"Side Plank",cat:"Core",desc:"Forearm side plank, hips stacked. Hold each side.",reps:"30s each",equip:"None"},
+  {id:"rot-throw",name:"Rotational Throws",cat:"Rotation",desc:"Stand sideways to wall, rotate explosively to throw med ball.",reps:"10 each",equip:"Med Ball + Wall"},
+  {id:"woodchop",name:"Band Woodchops",cat:"Rotation",desc:"High-to-low diagonal pull with resistance band. Control the decel.",reps:"12 each",equip:"Resistance Band"},
+  {id:"pallof-press",name:"Pallof Press",cat:"Rotation",desc:"Anti-rotation press with band. Resist the pull, arms fully extended.",reps:"10 each",equip:"Resistance Band"},
+  {id:"torso-rot",name:"Standing Rotation",cat:"Rotation",desc:"Band at chest height, rotate torso away. Hips stay square.",reps:"15 each",equip:"Resistance Band"},
+  {id:"ladder",name:"Ladder Drills",cat:"Agility",desc:"Quick feet through agility ladder. In-in-out-out or icky shuffle.",reps:"4 lengths",equip:"Agility Ladder"},
+  {id:"cone-shuffle",name:"Cone Shuffles",cat:"Agility",desc:"Defensive lateral shuffles between cones 10ft apart. Stay low.",reps:"8 trips",equip:"2 Cones"},
+  {id:"split-step",name:"Split Step Jumps",cat:"Agility",desc:"Continuous split steps. Land balanced, ready to move any direction.",reps:"20 reps",equip:"None"},
+  {id:"suicides",name:"Suicide Sprints",cat:"Agility",desc:"Sprint to line 1, back, line 2, back, line 3, back. Full speed.",reps:"4 sets",equip:"4 Cones"},
+  {id:"sprint-back",name:"Sprint + Backpedal",cat:"Agility",desc:"Sprint 20ft forward, backpedal to start. Stay on balls of feet.",reps:"6 trips",equip:"None"},
+  {id:"box-jump",name:"Box Jumps",cat:"Lower Body",desc:"Explosive jump onto box, step down. Land soft, knees over toes.",reps:"12 reps",equip:'20-24" Box'},
+  {id:"lat-lunge",name:"Lateral Lunges",cat:"Lower Body",desc:"Deep lateral lunges, push off explosively back to center.",reps:"10 each",equip:"None"},
+  {id:"squat-jump",name:"Squat Jumps",cat:"Lower Body",desc:"Full squat then explode up. Land soft, immediately descend.",reps:"15 reps",equip:"None"},
+  {id:"single-hop",name:"Single Leg Hops",cat:"Lower Body",desc:"Forward hops on one leg. Stick the landing, control the knee.",reps:"8 each",equip:"None"},
+  {id:"calf-raise",name:"Calf Raises",cat:"Lower Body",desc:"Slow calf raises on edge of step. 3 second hold at the top.",reps:"20 reps",equip:"Step"},
+  {id:"wall-throw",name:"Wall Throws",cat:"Upper Body",desc:"Med ball chest throws against wall. Explosive push, catch on rebound.",reps:"15 reps",equip:"Med Ball + Wall"},
+  {id:"pushups",name:"Push-Up Variations",cat:"Upper Body",desc:"Mix of standard, wide, diamond. Chest to floor each rep.",reps:"15 reps",equip:"None"},
+  {id:"band-pull",name:"Band Pull-Aparts",cat:"Upper Body",desc:"Resistance band at chest height, pull apart to full extension.",reps:"15 reps",equip:"Resistance Band"},
+  {id:"oh-throw",name:"Overhead Throws",cat:"Upper Body",desc:"Med ball overhead slam throws. Full extension, explosive.",reps:"12 reps",equip:"Med Ball"},
+  {id:"jump-rope",name:"Jump Rope",cat:"Cardio",desc:"Alternate regular bounce, boxer skip, and high knees.",reps:"Full dur",equip:"Jump Rope"},
+  {id:"mt-climbers",name:"Mountain Climbers",cat:"Cardio",desc:"Fast alternating knee drives from push-up position.",reps:"30 reps",equip:"None"},
+  {id:"burpees",name:"Burpees",cat:"Cardio",desc:"Squat, jump back, push-up, jump forward, jump up. No stopping.",reps:"10 reps",equip:"None"},
+  {id:"high-knees",name:"High Knees",cat:"Cardio",desc:"Running in place, driving knees above hip height. Pump the arms.",reps:"30 sec",equip:"None"},
+];
+const EX_CATS=["All",...Array.from(new Set(EXERCISES.map(e=>e.cat)))];
+
+const DRILLS=[
+  {
+    id:"cc-fh",name:"Crosscourt Forehand",cat:"Groundstrokes",diff:"Beginner",skill:"Forehand",
+    desc:"Rally crosscourt FH from deuce side. Both players start on the deuce (right) side of the baseline. Hit forehands diagonally crosscourt to each other, aiming deep into the service box corner. Focus on consistent topspin, high net clearance, and recovering to center after each shot.",
+    tips:["Keep a high net clearance — aim 3-5 feet over the net","Follow through across your body for natural topspin","Small split step between shots to stay balanced","Turn sideways before contact and rotate through the core","Use targets or cones in the crosscourt zone to build accuracy"],
+    youtubeId:"UwIPqGkQO80",youtubeStart:80,youtubeEnd:150,courtType:"singles",
+    players:[{id:"A",x:50,y:95,color:BH.shotBlue},{id:"B",x:50,y:5,color:BH.shotRed}],
+    steps:[
+      {t:"move",f:[50,95],to:[72,95],c:BH.shotBlue,note:"A moves to deuce side"},
+      {t:"hit",f:[72,95],to:[28,8],c:BH.shotBlue,n:"1",shot:"forehand",hitter:"A",note:"Crosscourt FH deep"},
+      {t:"move",f:[72,95],to:[50,95],c:BH.shotBlue,note:"A recovers to center"},
+      {t:"move",f:[50,5],to:[28,5],c:BH.shotRed,note:"B moves to ball"},
+      {t:"hit",f:[28,5],to:[72,95],c:BH.shotRed,n:"2",shot:"forehand",hitter:"B",note:"Crosscourt FH back"},
+      {t:"move",f:[28,5],to:[50,5],c:BH.shotRed,note:"B recovers to center"},
+      {t:"move",f:[50,95],to:[72,95],c:BH.shotBlue,note:"A moves to ball"},
+      {t:"hit",f:[72,95],to:[28,8],c:BH.shotBlue,n:"3",shot:"forehand",hitter:"A",note:"Crosscourt FH deep"},
+      {t:"move",f:[72,95],to:[50,95],c:BH.shotBlue,note:"A recovers to center"}
+    ]
+  },
+  {
+    id:"cc-bh",name:"Crosscourt Backhand",cat:"Groundstrokes",diff:"Beginner",skill:"Backhand",
+    desc:"Rally crosscourt BH from ad side",
+    tips:["Rotate shoulders fully","Let the racquet do the work","Stay on the balls of your feet"],
+    youtubeId:null,courtType:"singles",
+    players:[{id:"A",x:28,y:92,color:BH.shotBlue},{id:"B",x:72,y:8,color:BH.shotRed}],
+    steps:[
+      {t:"hit",f:[28,92],to:[72,8],c:BH.shotBlue,n:"1",shot:"backhand",hitter:"A"},
+      {t:"move",f:[28,92],to:[50,80],c:BH.shotBlue},
+      {t:"hit",f:[72,8],to:[28,8],c:BH.shotRed,n:"2",shot:"backhand",hitter:"B"},
+      {t:"move",f:[72,8],to:[50,20],c:BH.shotRed},
+      {t:"hit",f:[50,80],to:[72,8],c:BH.shotBlue,n:"3",shot:"backhand",hitter:"A"}
+    ]
+  },
+  {
+    id:"dtl-fh",name:"Down the Line Forehand",cat:"Groundstrokes",diff:"Intermediate",skill:"Forehand",
+    desc:"DTL forehands from deuce",
+    tips:["Hit up the line, not across","Adjust your court position","Trust your footwork"],
+    youtubeId:null,courtType:"singles",
+    players:[{id:"A",x:72,y:92,color:BH.shotBlue},{id:"B",x:72,y:8,color:BH.shotRed}],
+    steps:[
+      {t:"hit",f:[72,92],to:[72,8],c:BH.shotBlue,n:"1",shot:"forehand",hitter:"A"},
+      {t:"move",f:[72,92],to:[50,80],c:BH.shotBlue},
+      {t:"hit",f:[72,8],to:[72,8],c:BH.shotRed,n:"2",shot:"forehand",hitter:"B"},
+      {t:"move",f:[72,8],to:[50,20],c:BH.shotRed}
+    ]
+  },
+  {
+    id:"dtl-bh",name:"Down the Line Backhand",cat:"Groundstrokes",diff:"Intermediate",skill:"Backhand",
+    desc:"DTL backhands from ad",
+    tips:["Keep your wrist firm","Follow the line through","Explosive start and recovery"],
+    youtubeId:null,courtType:"singles",
+    players:[{id:"A",x:28,y:92,color:BH.shotBlue},{id:"B",x:28,y:8,color:BH.shotRed}],
+    steps:[
+      {t:"hit",f:[28,92],to:[28,8],c:BH.shotBlue,n:"1",shot:"backhand",hitter:"A"},
+      {t:"move",f:[28,92],to:[50,80],c:BH.shotBlue},
+      {t:"hit",f:[28,8],to:[28,8],c:BH.shotRed,n:"2",shot:"backhand",hitter:"B"}
+    ]
+  },
+  {
+    id:"io-fh",name:"Inside-Out Forehand",cat:"Groundstrokes",diff:"Advanced",skill:"Forehand",
+    desc:"Run around BH to hit IO FH",
+    tips:["Read the incoming ball early","Take a big first step","Finish with a strong FH"],
+    youtubeId:null,courtType:"singles",
+    players:[{id:"A",x:50,y:90,color:BH.shotBlue},{id:"B",x:72,y:8,color:BH.shotRed}],
+    steps:[
+      {t:"hit",f:[72,8],to:[28,82],c:BH.shotRed,n:"1",shot:"forehand",hitter:"B",note:"To BH side"},
+      {t:"move",f:[50,90],to:[35,85],c:BH.shotBlue,note:"Run around"},
+      {t:"hit",f:[35,85],to:[72,8],c:BH.shotBlue,n:"2",shot:"forehand",hitter:"A",note:"Inside-out FH!"},
+      {t:"move",f:[35,85],to:[50,80],c:BH.shotBlue}
+    ]
+  },
+  {
+    id:"fig8",name:"Figure 8 Rally",cat:"Groundstrokes",diff:"Advanced",skill:"Groundstroke",
+    desc:"Alternate crosscourt and DTL",
+    tips:["Stay ready between shots","Vary your court position","Mix speeds and spins"],
+    youtubeId:null,courtType:"singles",
+    players:[{id:"A",x:50,y:90,color:BH.shotBlue},{id:"B",x:50,y:10,color:BH.shotRed}],
+    steps:[
+      {t:"hit",f:[50,90],to:[72,8],c:BH.shotBlue,n:"1",shot:"forehand",hitter:"A",note:"Crosscourt"},
+      {t:"hit",f:[50,10],to:[28,8],c:BH.shotRed,n:"2",shot:"backhand",hitter:"B",note:"DTL"},
+      {t:"move",f:[50,90],to:[28,85],c:BH.shotBlue},
+      {t:"hit",f:[28,85],to:[72,8],c:BH.shotBlue,n:"3",shot:"backhand",hitter:"A",note:"Crosscourt"},
+      {t:"hit",f:[28,8],to:[28,8],c:BH.shotRed,n:"4",shot:"forehand",hitter:"B",note:"DTL"}
+    ]
+  },
+  {
+    id:"sv-wide-d",name:"Serve Wide Deuce",cat:"Serve & Return",diff:"Intermediate",skill:"Serve+1",
+    desc:"Wide serve + first ball attack",
+    tips:["Kick it out wide","Close to net quickly","Attack the open court"],
+    youtubeId:null,courtType:"singles",
+    players:[{id:"S",x:55,y:98,color:BH.shotBlue},{id:"R",x:50,y:5,color:BH.shotRed}],
+    steps:[
+      {t:"hit",f:[55,98],to:[72,20],c:BH.shotBlue,n:"1",shot:"serve",hitter:"S",note:"Wide"},
+      {t:"move",f:[50,5],to:[72,20],c:BH.shotRed,note:"Pushed wide"},
+      {t:"hit",f:[72,20],to:[50,45],c:BH.shotRed,n:"2",shot:"forehand",hitter:"R"},
+      {t:"move",f:[55,98],to:[50,65],c:BH.shotBlue,note:"Approach"},
+      {t:"hit",f:[50,65],to:[28,8],c:BH.shotBlue,n:"3",shot:"forehand",hitter:"S",note:"Attack open court"}
+    ]
+  },
+  {
+    id:"sv-t-d",name:"Serve T Deuce",cat:"Serve & Return",diff:"Intermediate",skill:"Serve+1",
+    desc:"T serve + first ball",
+    tips:["Precision over speed","Play the percentages","First ball dictates point"],
+    youtubeId:null,courtType:"singles",
+    players:[{id:"S",x:55,y:98,color:BH.shotBlue},{id:"R",x:50,y:5,color:BH.shotRed}],
+    steps:[
+      {t:"hit",f:[55,98],to:[50,25],c:BH.shotBlue,n:"1",shot:"serve",hitter:"S",note:"To T"},
+      {t:"move",f:[50,5],to:[50,25],c:BH.shotRed,note:"Jammed"},
+      {t:"hit",f:[50,25],to:[72,45],c:BH.shotRed,n:"2",shot:"forehand",hitter:"R"},
+      {t:"move",f:[55,98],to:[50,65],c:BH.shotBlue,note:"In"},
+      {t:"hit",f:[50,65],to:[28,8],c:BH.shotBlue,n:"3",shot:"forehand",hitter:"S"}
+    ]
+  },
+  {
+    id:"sv-wide-a",name:"Serve Wide Ad",cat:"Serve & Return",diff:"Intermediate",skill:"Serve+1",
+    desc:"Wide serve to ad court",
+    tips:["Different angle for ad court","Follow your serve","Exploit the open court"],
+    youtubeId:null,courtType:"singles",
+    players:[{id:"S",x:45,y:98,color:BH.shotBlue},{id:"R",x:50,y:5,color:BH.shotRed}],
+    steps:[
+      {t:"hit",f:[45,98],to:[28,20],c:BH.shotBlue,n:"1",shot:"serve",hitter:"S",note:"Wide ad"},
+      {t:"move",f:[50,5],to:[28,20],c:BH.shotRed,note:"Pushed wide"},
+      {t:"hit",f:[28,20],to:[50,45],c:BH.shotRed,n:"2",shot:"backhand",hitter:"R"},
+      {t:"move",f:[45,98],to:[50,65],c:BH.shotBlue,note:"In"},
+      {t:"hit",f:[50,65],to:[72,8],c:BH.shotBlue,n:"3",shot:"forehand",hitter:"S",note:"Open court"}
+    ]
+  },
+  {
+    id:"sv-kick",name:"Kick Serve + Approach",cat:"Serve & Return",diff:"Advanced",skill:"Serve+1",
+    desc:"Kick serve and follow to net",
+    tips:["Use kick to control returner","Attack with authority","Commit to the net"],
+    youtubeId:null,courtType:"singles",
+    players:[{id:"S",x:55,y:98,color:BH.shotBlue},{id:"R",x:50,y:5,color:BH.shotRed}],
+    steps:[
+      {t:"hit",f:[55,98],to:[50,28],c:BH.shotBlue,n:"1",shot:"serve",hitter:"S",note:"Kick"},
+      {t:"move",f:[55,98],to:[50,60],c:BH.shotBlue,note:"Approach"},
+      {t:"hit",f:[50,5],to:[50,60],c:BH.shotRed,n:"2",shot:"forehand",hitter:"R"},
+      {t:"hit",f:[50,60],to:[60,35],c:BH.shotBlue,n:"3",shot:"fh_volley",hitter:"S"}
+    ]
+  },
+  {
+    id:"ret-cc",name:"Return Crosscourt",cat:"Serve & Return",diff:"Beginner",skill:"Return",
+    desc:"Practice CC returns",
+    tips:["Early racquet prep","Step into it","Consistent depth"],
+    youtubeId:null,courtType:"singles",
+    players:[{id:"S",x:55,y:98,color:BH.shotBlue},{id:"R",x:72,y:5,color:BH.shotRed}],
+    steps:[
+      {t:"hit",f:[55,98],to:[50,20],c:BH.shotBlue,n:"1",shot:"serve",hitter:"S"},
+      {t:"hit",f:[72,5],to:[50,45],c:BH.shotRed,n:"2",shot:"forehand",hitter:"R",note:"CC return"},
+      {t:"move",f:[55,98],to:[50,65],c:BH.shotBlue},
+      {t:"hit",f:[50,65],to:[72,8],c:BH.shotBlue,n:"3",shot:"forehand",hitter:"S"},
+      {t:"move",f:[50,45],to:[50,25],c:BH.shotRed}
+    ]
+  },
+  {
+    id:"app-fh",name:"Approach FH + Volley",cat:"Net Play",diff:"Intermediate",skill:"Volley/Net",
+    desc:"FH approach DTL, close, volley CC",
+    tips:["Take the ball on the rise","Move your feet to net","Angle the volley"],
+    youtubeId:null,courtType:"singles",
+    players:[{id:"A",x:50,y:85,color:BH.shotBlue},{id:"B",x:50,y:8,color:BH.shotRed}],
+    steps:[
+      {t:"hit",f:[50,8],to:[50,65],c:BH.shotRed,n:"1",shot:"forehand",hitter:"B",note:"Short ball"},
+      {t:"move",f:[50,85],to:[50,65],c:BH.shotBlue,note:"Move in"},
+      {t:"hit",f:[50,65],to:[72,28],c:BH.shotBlue,n:"2",shot:"forehand",hitter:"A",note:"Approach DTL"},
+      {t:"move",f:[50,65],to:[50,55],c:BH.shotBlue,note:"Close to net"},
+      {t:"hit",f:[50,65],to:[50,55],c:BH.shotRed,n:"3",shot:"forehand",hitter:"B",note:"Pass attempt"},
+      {t:"hit",f:[50,55],to:[28,28],c:BH.shotBlue,n:"4",shot:"fh_volley",hitter:"A",note:"Volley CC"}
+    ]
+  },
+  {
+    id:"app-bh",name:"Approach BH + Volley",cat:"Net Play",diff:"Intermediate",skill:"Volley/Net",
+    desc:"BH approach DTL, close, volley",
+    tips:["Approach at an angle","Get sideways on the volley","Use your legs"],
+    youtubeId:null,courtType:"singles",
+    players:[{id:"A",x:50,y:85,color:BH.shotBlue},{id:"B",x:50,y:8,color:BH.shotRed}],
+    steps:[
+      {t:"hit",f:[50,8],to:[28,68],c:BH.shotRed,n:"1",shot:"forehand",hitter:"B",note:"To BH side"},
+      {t:"move",f:[50,85],to:[28,68],c:BH.shotBlue,note:"Move in"},
+      {t:"hit",f:[28,68],to:[28,28],c:BH.shotBlue,n:"2",shot:"backhand",hitter:"A",note:"Approach DTL"},
+      {t:"move",f:[28,68],to:[50,55],c:BH.shotBlue,note:"Close to net"},
+      {t:"hit",f:[28,28],to:[50,55],c:BH.shotRed,n:"3",shot:"forehand",hitter:"B",note:"Pass"},
+      {t:"hit",f:[50,55],to:[72,28],c:BH.shotBlue,n:"4",shot:"bh_volley",hitter:"A",note:"Volley"}
+    ]
+  },
+  {
+    id:"vol-vol",name:"Volley-to-Volley",cat:"Net Play",diff:"Intermediate",skill:"Volley/Net",
+    desc:"Close range volley exchange",
+    tips:["Quick reactions","Short backswing","Control and placement"],
+    youtubeId:null,courtType:"singles",
+    players:[{id:"A",x:40,y:62,color:BH.shotBlue},{id:"B",x:60,y:38,color:BH.shotRed}],
+    steps:[
+      {t:"hit",f:[40,62],to:[60,38],c:BH.shotBlue,n:"1",shot:"fh_volley",hitter:"A"},
+      {t:"hit",f:[60,38],to:[40,62],c:BH.shotRed,n:"2",shot:"bh_volley",hitter:"B"},
+      {t:"hit",f:[40,62],to:[60,38],c:BH.shotBlue,n:"3",shot:"bh_volley",hitter:"A"},
+      {t:"hit",f:[60,38],to:[40,62],c:BH.shotRed,n:"4",shot:"fh_volley",hitter:"B"}
+    ]
+  },
+  {
+    id:"oh-drill",name:"Overhead + Recovery",cat:"Net Play",diff:"Advanced",skill:"Overhead",
+    desc:"Lob defense with overhead",
+    tips:["Turn sideways for the lob","Use explosive leg drive","Follow your shot back"],
+    youtubeId:null,courtType:"singles",
+    players:[{id:"A",x:50,y:58,color:BH.shotBlue},{id:"B",x:50,y:8,color:BH.shotRed}],
+    steps:[
+      {t:"hit",f:[50,8],to:[50,28],c:BH.shotRed,n:"1",shot:"forehand",hitter:"B",note:"Lob"},
+      {t:"move",f:[50,58],to:[50,35],c:BH.shotBlue,note:"Back for lob"},
+      {t:"hit",f:[50,35],to:[50,8],c:BH.shotBlue,n:"2",shot:"overhead",hitter:"A"},
+      {t:"move",f:[50,35],to:[50,55],c:BH.shotBlue,note:"Back to net"},
+      {t:"hit",f:[50,8],to:[50,35],c:BH.shotRed,n:"3",shot:"forehand",hitter:"B",note:"Another lob"},
+      {t:"hit",f:[50,55],to:[50,8],c:BH.shotBlue,n:"4",shot:"overhead",hitter:"A"}
+    ]
+  },
+  {
+    id:"drop-vol",name:"Drop Volley Touch",cat:"Net Play",diff:"Advanced",skill:"Volley/Net",
+    desc:"Soft drop volley from net",
+    tips:["Shorten your stroke","Soft hands","Draw the opponent in"],
+    youtubeId:null,courtType:"singles",
+    players:[{id:"A",x:50,y:56,color:BH.shotBlue},{id:"B",x:50,y:92,color:BH.shotRed}],
+    steps:[
+      {t:"hit",f:[50,92],to:[50,56],c:BH.shotRed,n:"1",shot:"forehand",hitter:"B",note:"Drive"},
+      {t:"hit",f:[50,56],to:[50,75],c:BH.shotBlue,n:"2",shot:"fh_volley",hitter:"A",note:"Drop volley"},
+      {t:"move",f:[50,92],to:[50,75],c:BH.shotRed,note:"Run in"},
+      {t:"hit",f:[50,75],to:[50,62],c:BH.shotRed,n:"3",shot:"forehand",hitter:"B",note:"Short"},
+      {t:"hit",f:[50,75],to:[50,70],c:BH.shotBlue,n:"4",shot:"fh_volley",hitter:"A",note:"Another drop"}
+    ]
+  },
+  {
+    id:"sv-io",name:"Serve + Inside-Out FH",cat:"Patterns",diff:"Advanced",skill:"Patterns",
+    desc:"Serve then run around for IO FH",
+    tips:["Set up with wide serve","Take big first step","Trust your FH"],
+    youtubeId:null,courtType:"singles",
+    players:[{id:"S",x:55,y:98,color:BH.shotBlue},{id:"R",x:50,y:5,color:BH.shotRed}],
+    steps:[
+      {t:"hit",f:[55,98],to:[72,22],c:BH.shotBlue,n:"1",shot:"serve",hitter:"S",note:"Wide"},
+      {t:"hit",f:[50,5],to:[50,48],c:BH.shotRed,n:"2",shot:"forehand",hitter:"R",note:"Return CC/BH side"},
+      {t:"move",f:[55,98],to:[35,72],c:BH.shotBlue,note:"Run around BH"},
+      {t:"hit",f:[35,72],to:[72,8],c:BH.shotBlue,n:"3",shot:"forehand",hitter:"S",note:"Inside-out!"}
+    ]
+  },
+  {
+    id:"cc-atk",name:"Rally Cross → Attack DTL",cat:"Patterns",diff:"Intermediate",skill:"Patterns",
+    desc:"Build rally CC then attack DTL",
+    tips:["Patience then aggression","Set up your attack","Finish the point"],
+    youtubeId:null,courtType:"singles",
+    players:[{id:"A",x:72,y:90,color:BH.shotBlue},{id:"B",x:28,y:10,color:BH.shotRed}],
+    steps:[
+      {t:"hit",f:[72,90],to:[28,8],c:BH.shotBlue,n:"1",shot:"forehand",hitter:"A",note:"CC"},
+      {t:"hit",f:[28,10],to:[72,8],c:BH.shotRed,n:"2",shot:"forehand",hitter:"B",note:"CC"},
+      {t:"hit",f:[72,90],to:[28,8],c:BH.shotBlue,n:"3",shot:"forehand",hitter:"A",note:"CC heavy"},
+      {t:"hit",f:[28,10],to:[50,45],c:BH.shotRed,n:"4",shot:"forehand",hitter:"B",note:"Floats short"},
+      {t:"hit",f:[72,90],to:[72,8],c:BH.shotBlue,n:"5",shot:"forehand",hitter:"A",note:"Attack DTL!"}
+    ]
+  },
+  {
+    id:"def-off",name:"Defense to Offense",cat:"Patterns",diff:"Advanced",skill:"Patterns",
+    desc:"Pushed wide, recover, counterattack",
+    tips:["Defensive positioning","Load up on recovery","Strike when ready"],
+    youtubeId:null,courtType:"singles",
+    players:[{id:"A",x:50,y:90,color:BH.shotBlue},{id:"B",x:50,y:10,color:BH.shotRed}],
+    steps:[
+      {t:"hit",f:[50,10],to:[72,80],c:BH.shotRed,n:"1",shot:"forehand",hitter:"B",note:"Push wide"},
+      {t:"hit",f:[50,90],to:[50,45],c:BH.shotBlue,n:"2",shot:"slice_fh",hitter:"A",note:"Defensive CC"},
+      {t:"hit",f:[72,80],to:[50,55],c:BH.shotRed,n:"3",shot:"forehand",hitter:"B",note:"To center"},
+      {t:"move",f:[50,90],to:[35,85],c:BH.shotBlue,note:"Load"},
+      {t:"hit",f:[35,85],to:[28,8],c:BH.shotBlue,n:"4",shot:"backhand",hitter:"A",note:"Counterattack DTL"}
+    ]
+  },
+  {
+    id:"two-ball",name:"Two-Ball Attack",cat:"Patterns",diff:"Intermediate",skill:"Patterns",
+    desc:"Hit approach + pass then volley",
+    tips:["First shot decisive","Move forward on second","Volley for winner"],
+    youtubeId:null,courtType:"singles",
+    players:[{id:"A",x:50,y:80,color:BH.shotBlue},{id:"B",x:50,y:15,color:BH.shotRed}],
+    steps:[
+      {t:"hit",f:[50,15],to:[50,65],c:BH.shotRed,n:"1",shot:"forehand",hitter:"B",note:"Short feed"},
+      {t:"hit",f:[50,80],to:[72,35],c:BH.shotBlue,n:"2",shot:"forehand",hitter:"A",note:"Approach"},
+      {t:"move",f:[50,80],to:[50,55],c:BH.shotBlue,note:"To net"},
+      {t:"hit",f:[50,65],to:[50,55],c:BH.shotRed,n:"3",shot:"forehand",hitter:"B",note:"Pass try"},
+      {t:"hit",f:[50,55],to:[28,28],c:BH.shotBlue,n:"4",shot:"fh_volley",hitter:"A",note:"Volley winner"}
+    ]
+  },
+  {
+    id:"dbl-poach",name:"Doubles Poach",cat:"Doubles",diff:"Intermediate",skill:"Doubles",
+    desc:"Net player reads and poaches",
+    tips:["Read the rally","Time the intercept","Put away the volley"],
+    youtubeId:null,courtType:"doubles",
+    players:[{id:"A1",x:72,y:90,color:BH.shotBlue},{id:"A2",x:32,y:58,color:BH.shotBlue},{id:"B1",x:28,y:10,color:BH.shotRed},{id:"B2",x:68,y:42,color:BH.shotRed}],
+    steps:[
+      {t:"hit",f:[72,90],to:[28,8],c:BH.shotBlue,n:"1",shot:"forehand",hitter:"A1",note:"CC"},
+      {t:"hit",f:[28,10],to:[72,8],c:BH.shotRed,n:"2",shot:"forehand",hitter:"B1",note:"CC"},
+      {t:"move",f:[32,58],to:[50,58],c:BH.shotBlue,note:"Poach read"},
+      {t:"hit",f:[28,10],to:[50,58],c:BH.shotRed,n:"3",shot:"forehand",hitter:"B1",note:"To center"},
+      {t:"hit",f:[50,58],to:[28,28],c:BH.shotBlue,n:"4",shot:"fh_volley",hitter:"A2",note:"Poach volley"}
+    ]
+  },
+  {
+    id:"dbl-sv",name:"Doubles S&V",cat:"Doubles",diff:"Intermediate",skill:"Doubles",
+    desc:"Serve and both close to net",
+    tips:["Aggressive serving position","Net player supports","Quick first volley"],
+    youtubeId:null,courtType:"doubles",
+    players:[{id:"S",x:58,y:98,color:BH.shotBlue},{id:"N1",x:28,y:56,color:BH.shotBlue},{id:"R",x:28,y:5,color:BH.shotRed},{id:"N2",x:72,y:44,color:BH.shotRed}],
+    steps:[
+      {t:"hit",f:[58,98],to:[50,22],c:BH.shotBlue,n:"1",shot:"serve",hitter:"S",note:"Wide"},
+      {t:"move",f:[58,98],to:[50,60],c:BH.shotBlue,note:"Approach"},
+      {t:"hit",f:[28,5],to:[50,50],c:BH.shotRed,n:"2",shot:"backhand",hitter:"R",note:"Return"},
+      {t:"hit",f:[50,60],to:[50,35],c:BH.shotBlue,n:"3",shot:"fh_volley",hitter:"S",note:"Deep volley"},
+      {t:"move",f:[50,60],to:[50,55],c:BH.shotBlue,note:"Closer"}
+    ]
+  },
+  {
+    id:"dbl-ifm",name:"I-Formation",cat:"Doubles",diff:"Advanced",skill:"Doubles",
+    desc:"I-formation serve with signal plays",
+    tips:["Communicate the play","Execute the movement","Finish at net"],
+    youtubeId:null,courtType:"doubles",
+    players:[{id:"S",x:50,y:98,color:BH.shotBlue},{id:"N",x:50,y:56,color:BH.shotBlue},{id:"R",x:28,y:5,color:BH.shotRed},{id:"R2",x:72,y:44,color:BH.shotRed}],
+    steps:[
+      {t:"hit",f:[50,98],to:[72,20],c:BH.shotBlue,n:"1",shot:"serve",hitter:"S",note:"Wide"},
+      {t:"move",f:[50,56],to:[72,56],c:BH.shotBlue,note:"Move to deuce"},
+      {t:"hit",f:[28,5],to:[50,45],c:BH.shotRed,n:"2",shot:"forehand",hitter:"R",note:"Return CC"},
+      {t:"hit",f:[72,56],to:[50,45],c:BH.shotBlue,n:"3",shot:"fh_volley",hitter:"N",note:"Intercept volley"}
+    ]
+  },
+  {
+    id:"dbl-lob",name:"Lob Defense",cat:"Doubles",diff:"Intermediate",skill:"Doubles",
+    desc:"Handle lob over net player",
+    tips:["Communicate switch","Track the ball","Explosive recovery"],
+    youtubeId:null,courtType:"doubles",
+    players:[{id:"A1",x:65,y:58,color:BH.shotBlue},{id:"A2",x:35,y:90,color:BH.shotBlue},{id:"B1",x:35,y:42,color:BH.shotRed},{id:"B2",x:65,y:10,color:BH.shotRed}],
+    steps:[
+      {t:"hit",f:[35,42],to:[50,35],c:BH.shotRed,n:"1",shot:"forehand",hitter:"B1",note:"Lob over A1"},
+      {t:"move",f:[65,58],to:[50,42],c:BH.shotBlue,note:"Track"},
+      {t:"move",f:[35,90],to:[50,60],c:BH.shotBlue,note:"Switch"},
+      {t:"hit",f:[50,60],to:[50,8],c:BH.shotBlue,n:"2",shot:"overhead",hitter:"A2"}
+    ]
+  },
+  // === SKILL FOCUS ADDITIONS (VIDEO-BASED, TIMECODED) ===
+  {
+    id:"sv-grip",name:"Serve Grip Check",cat:"Skill Focus",diff:"Beginner",skill:"Serve",
+    desc:"Confirm a neutral continental grip before accelerating.",
+    tips:["Continental grip","Relax the hand","Check the V lines"],
+    youtubeId:"QiVszYWaIO0",youtubeStart:285,youtubeEnd:310,courtType:"singles",
+    players:[{id:"S",x:55,y:98,color:BH.shotBlue},{id:"R",x:50,y:5,color:BH.shotRed}],
+    steps:[{t:"hit",f:[55,98],to:[50,25],c:BH.shotBlue,n:"1",shot:"serve",hitter:"S",note:"Grip check"}]
+  },
+  {
+    id:"sv-stance",name:"Serve Stance Setup",cat:"Skill Focus",diff:"Beginner",skill:"Serve",
+    desc:"Build a stable base and balanced posture at the start.",
+    tips:["Athletic base","Weight centered","Repeatable stance"],
+    youtubeId:"QiVszYWaIO0",youtubeStart:310,youtubeEnd:347,courtType:"singles",
+    players:[{id:"S",x:55,y:98,color:BH.shotBlue},{id:"R",x:50,y:5,color:BH.shotRed}],
+    steps:[{t:"hit",f:[55,98],to:[50,22],c:BH.shotBlue,n:"1",shot:"serve",hitter:"S",note:"Stance focus"}]
+  },
+  {
+    id:"sv-toss",name:"Serve Toss Drill",cat:"Skill Focus",diff:"Beginner",skill:"Serve",
+    desc:"Groove a consistent toss placement before contact.",
+    tips:["Same release every time","Toss to target","Hold finish"],
+    youtubeId:"QiVszYWaIO0",youtubeStart:363,youtubeEnd:426,courtType:"singles",
+    players:[{id:"S",x:55,y:98,color:BH.shotBlue},{id:"R",x:50,y:5,color:BH.shotRed}],
+    steps:[{t:"hit",f:[55,98],to:[50,22],c:BH.shotBlue,n:"1",shot:"serve",hitter:"S",note:"Toss target"}]
+  },
+  {
+    id:"sv-contact",name:"Serve Contact & Pronation",cat:"Skill Focus",diff:"Intermediate",skill:"Serve",
+    desc:"Accelerate through contact with clean pronation.",
+    tips:["Reach up","Loose wrist","Finish across body"],
+    youtubeId:"QiVszYWaIO0",youtubeStart:480,youtubeEnd:528,courtType:"singles",
+    players:[{id:"S",x:55,y:98,color:BH.shotBlue},{id:"R",x:50,y:5,color:BH.shotRed}],
+    steps:[{t:"hit",f:[55,98],to:[50,25],c:BH.shotBlue,n:"1",shot:"serve",hitter:"S",note:"Contact focus"}]
+  },
+  {
+    id:"sv-placement",name:"Serve Placement Drill",cat:"Skill Focus",diff:"Intermediate",skill:"Serve",
+    desc:"Hit 3 targets to build precision before adding pace.",
+    tips:["Aim first","Use targets","Same rhythm each serve"],
+    youtubeId:"QiVszYWaIO0",youtubeStart:609,youtubeEnd:642,courtType:"singles",
+    players:[{id:"S",x:55,y:98,color:BH.shotBlue},{id:"R",x:50,y:5,color:BH.shotRed}],
+    steps:[{t:"hit",f:[55,98],to:[72,22],c:BH.shotBlue,n:"1",shot:"serve",hitter:"S",note:"Target serve"}]
+  },
+  {
+    id:"fh-ball-1",name:"FH Ball Machine Drill 1",cat:"Skill Focus",diff:"Beginner",skill:"Forehand",
+    desc:"Groove the first ball-machine pattern with clean contact.",
+    tips:["Racquet set early","Stay balanced","Finish across body"],
+    youtubeId:"nyQSDaXOCQ8",youtubeStart:51,youtubeEnd:177,courtType:"singles",
+    players:[{id:"A",x:50,y:92,color:BH.shotBlue}],
+    steps:[{t:"hit",f:[50,92],to:[28,8],c:BH.shotBlue,n:"1",shot:"forehand",hitter:"A"}]
+  },
+  {
+    id:"fh-ball-2",name:"FH Ball Machine Drill 2",cat:"Skill Focus",diff:"Beginner",skill:"Forehand",
+    desc:"Build depth control with the second ball-machine pattern.",
+    tips:["High net clearance","Use legs","Recover to center"],
+    youtubeId:"nyQSDaXOCQ8",youtubeStart:177,youtubeEnd:292,courtType:"singles",
+    players:[{id:"A",x:60,y:92,color:BH.shotBlue}],
+    steps:[{t:"hit",f:[60,92],to:[40,8],c:BH.shotBlue,n:"1",shot:"forehand",hitter:"A"}]
+  },
+  {
+    id:"fh-ball-3",name:"FH Ball Machine Drill 3",cat:"Skill Focus",diff:"Intermediate",skill:"Forehand",
+    desc:"Use forehand patterns to handle height changes.",
+    tips:["Adjust with legs","Brush up","Finish balanced"],
+    youtubeId:"nyQSDaXOCQ8",youtubeStart:292,youtubeEnd:370,courtType:"singles",
+    players:[{id:"A",x:50,y:90,color:BH.shotBlue}],
+    steps:[{t:"hit",f:[50,90],to:[72,8],c:BH.shotBlue,n:"1",shot:"forehand",hitter:"A"}]
+  },
+  {
+    id:"fh-ball-4",name:"FH Ball Machine Drill 4",cat:"Skill Focus",diff:"Intermediate",skill:"Forehand",
+    desc:"Attack short balls and recover quickly.",
+    tips:["Explode forward","Stay low","Recover fast"],
+    youtubeId:"nyQSDaXOCQ8",youtubeStart:370,youtubeEnd:492,courtType:"singles",
+    players:[{id:"A",x:50,y:85,color:BH.shotBlue}],
+    steps:[{t:"hit",f:[50,85],to:[72,28],c:BH.shotBlue,n:"1",shot:"forehand",hitter:"A",note:"Short ball"}]
+  },
+  {
+    id:"fh-ball-5",name:"FH Ball Machine Drill 5",cat:"Skill Focus",diff:"Intermediate",skill:"Forehand",
+    desc:"Handle deep balls with heavy topspin.",
+    tips:["Load on back leg","Drive up","Recover to middle"],
+    youtubeId:"nyQSDaXOCQ8",youtubeStart:492,youtubeEnd:552,courtType:"singles",
+    players:[{id:"A",x:50,y:92,color:BH.shotBlue}],
+    steps:[{t:"hit",f:[50,92],to:[50,8],c:BH.shotBlue,n:"1",shot:"forehand",hitter:"A"}]
+  },
+  {
+    id:"bh-options",name:"Backhand High-Ball Options",cat:"Skill Focus",diff:"Intermediate",skill:"Backhand",
+    desc:"Choose the best option when the ball rises above shoulder height.",
+    tips:["Decide early","Use spacing","Commit to the choice"],
+    youtubeId:"5eWB8YyIz8o",youtubeStart:30,youtubeEnd:148,courtType:"singles",
+    players:[{id:"A",x:28,y:90,color:BH.shotBlue}],
+    steps:[{t:"hit",f:[28,90],to:[72,8],c:BH.shotBlue,n:"1",shot:"backhand",hitter:"A",note:"High ball"}]
+  },
+  {
+    id:"bh-technique",name:"Backhand High-Ball Technique",cat:"Skill Focus",diff:"Intermediate",skill:"Backhand",
+    desc:"Key technique cues for high-ball backhands.",
+    tips:["Create space","Stay tall","Finish through target"],
+    youtubeId:"5eWB8YyIz8o",youtubeStart:148,youtubeEnd:183,courtType:"singles",
+    players:[{id:"A",x:28,y:90,color:BH.shotBlue}],
+    steps:[{t:"hit",f:[28,90],to:[72,8],c:BH.shotBlue,n:"1",shot:"backhand",hitter:"A"}]
+  },
+  {
+    id:"bh-contact",name:"Backhand Contact Point",cat:"Skill Focus",diff:"Beginner",skill:"Backhand",
+    desc:"Find clean contact on high balls with a stable head.",
+    tips:["Contact out in front","Stable wrist","Balanced finish"],
+    youtubeId:"5eWB8YyIz8o",youtubeStart:183,youtubeEnd:211,courtType:"singles",
+    players:[{id:"A",x:28,y:90,color:BH.shotBlue}],
+    steps:[{t:"hit",f:[28,90],to:[72,8],c:BH.shotBlue,n:"1",shot:"backhand",hitter:"A"}]
+  },
+  {
+    id:"bh-drill-1",name:"Backhand Drill 1",cat:"Skill Focus",diff:"Intermediate",skill:"Backhand",
+    desc:"Use a repeatable pattern to build high-ball consistency.",
+    tips:["Same rhythm","Aim big targets","Recover quickly"],
+    youtubeId:"5eWB8YyIz8o",youtubeStart:211,youtubeEnd:250,courtType:"singles",
+    players:[{id:"A",x:28,y:90,color:BH.shotBlue}],
+    steps:[{t:"hit",f:[28,90],to:[72,8],c:BH.shotBlue,n:"1",shot:"backhand",hitter:"A"}]
+  },
+  {
+    id:"bh-ball-machine",name:"Backhand Ball Machine Drills",cat:"Skill Focus",diff:"Intermediate",skill:"Backhand",
+    desc:"Ball-machine sequences for high-ball backhands.",
+    tips:["Move through the ball","Finish balanced","Recover to center"],
+    youtubeId:"5eWB8YyIz8o",youtubeStart:417,youtubeEnd:521,courtType:"singles",
+    players:[{id:"A",x:28,y:92,color:BH.shotBlue}],
+    steps:[{t:"hit",f:[28,92],to:[72,8],c:BH.shotBlue,n:"1",shot:"backhand",hitter:"A"}]
+  },
+  {
+    id:"ret-split",name:"Return Split Step",cat:"Skill Focus",diff:"Beginner",skill:"Return",
+    desc:"Time the split step to react to the serve.",
+    tips:["Split as ball leaves strings","Stay low","Short first step"],
+    youtubeId:"QnKKocEn77g",youtubeStart:18,youtubeEnd:60,courtType:"singles",
+    players:[{id:"S",x:55,y:98,color:BH.shotBlue},{id:"R",x:50,y:5,color:BH.shotRed}],
+    steps:[
+      {t:"hit",f:[55,98],to:[50,22],c:BH.shotBlue,n:"1",shot:"serve",hitter:"S"},
+      {t:"hit",f:[50,5],to:[50,45],c:BH.shotRed,n:"2",shot:"forehand",hitter:"R",note:"Split + return"}
+    ]
+  },
+  {
+    id:"ret-timing",name:"Return Timing",cat:"Skill Focus",diff:"Beginner",skill:"Return",
+    desc:"Load early and meet the ball in front.",
+    tips:["Early prep","Compact swing","Eyes on contact"],
+    youtubeId:"QnKKocEn77g",youtubeStart:60,youtubeEnd:91,courtType:"singles",
+    players:[{id:"S",x:55,y:98,color:BH.shotBlue},{id:"R",x:50,y:5,color:BH.shotRed}],
+    steps:[
+      {t:"hit",f:[55,98],to:[50,22],c:BH.shotBlue,n:"1",shot:"serve",hitter:"S"},
+      {t:"hit",f:[50,5],to:[50,45],c:BH.shotRed,n:"2",shot:"backhand",hitter:"R"}
+    ]
+  },
+  {
+    id:"ret-position",name:"Return Positioning",cat:"Skill Focus",diff:"Beginner",skill:"Return",
+    desc:"Adjust return position based on serve and court speed.",
+    tips:["Start neutral","Adjust depth","Recover quickly"],
+    youtubeId:"QnKKocEn77g",youtubeStart:91,youtubeEnd:159,courtType:"singles",
+    players:[{id:"S",x:55,y:98,color:BH.shotBlue},{id:"R",x:50,y:5,color:BH.shotRed}],
+    steps:[
+      {t:"hit",f:[55,98],to:[50,22],c:BH.shotBlue,n:"1",shot:"serve",hitter:"S"},
+      {t:"hit",f:[50,5],to:[50,45],c:BH.shotRed,n:"2",shot:"forehand",hitter:"R"}
+    ]
+  },
+  {
+    id:"ret-stance",name:"Return Stance",cat:"Skill Focus",diff:"Beginner",skill:"Return",
+    desc:"Use an athletic stance to handle pace and direction.",
+    tips:["Wide base","Hands in front","Explode to the ball"],
+    youtubeId:"QnKKocEn77g",youtubeStart:159,youtubeEnd:212,courtType:"singles",
+    players:[{id:"S",x:55,y:98,color:BH.shotBlue},{id:"R",x:50,y:5,color:BH.shotRed}],
+    steps:[
+      {t:"hit",f:[55,98],to:[50,22],c:BH.shotBlue,n:"1",shot:"serve",hitter:"S"},
+      {t:"hit",f:[50,5],to:[50,45],c:BH.shotRed,n:"2",shot:"forehand",hitter:"R"}
+    ]
+  },
+  {
+    id:"ret-block",name:"Block Return",cat:"Skill Focus",diff:"Intermediate",skill:"Return",
+    desc:"Neutralize pace with a firm block return.",
+    tips:["Short punch","Stable wrist","Aim deep middle"],
+    youtubeId:"QnKKocEn77g",youtubeStart:212,youtubeEnd:257,courtType:"singles",
+    players:[{id:"S",x:55,y:98,color:BH.shotBlue},{id:"R",x:50,y:5,color:BH.shotRed}],
+    steps:[
+      {t:"hit",f:[55,98],to:[50,22],c:BH.shotBlue,n:"1",shot:"serve",hitter:"S"},
+      {t:"hit",f:[50,5],to:[50,45],c:BH.shotRed,n:"2",shot:"backhand",hitter:"R",note:"Block"}
+    ]
+  },
+  {
+    id:"fw-fh-tech",name:"Footwork: FH Technique & Steps",cat:"Skill Focus",diff:"Beginner",skill:"Footwork",
+    desc:"Use clean setup steps to organize the forehand.",
+    tips:["Early unit turn","Small adjustment steps","Balance at contact"],
+    youtubeId:"nyQSDaXOCQ8",youtubeStart:33,youtubeEnd:124,courtType:"singles",
+    players:[{id:"A",x:50,y:92,color:BH.shotBlue}],
+    steps:[{t:"move",f:[50,92],to:[60,88],c:BH.shotBlue,note:"Adjust steps"}]
+  },
+  {
+    id:"fw-self-feed",name:"Footwork: Self-Feed Rhythm",cat:"Skill Focus",diff:"Beginner",skill:"Footwork",
+    desc:"Self-feed to control spacing and rhythm before striking.",
+    tips:["Feed to the hitting zone","Set feet early","Balance through contact"],
+    youtubeId:"R5w7dnZmC18",youtubeStart:61,youtubeEnd:98,courtType:"singles",
+    players:[{id:"A",x:50,y:92,color:BH.shotBlue}],
+    steps:[{t:"move",f:[50,92],to:[55,88],c:BH.shotBlue,note:"Self-feed + set"}]
+  },
+  {
+    id:"fw-stance",name:"Footwork: Stance Training",cat:"Skill Focus",diff:"Beginner",skill:"Footwork",
+    desc:"Choose open vs. neutral stance under control.",
+    tips:["Lower center of gravity","Stay athletic","Recover to center"],
+    youtubeId:"R5w7dnZmC18",youtubeStart:129,youtubeEnd:213,courtType:"singles",
+    players:[{id:"A",x:50,y:92,color:BH.shotBlue}],
+    steps:[{t:"move",f:[50,92],to:[40,88],c:BH.shotBlue,note:"Stance reps"}]
+  },
+  {
+    id:"fw-footwork",name:"Footwork: Movement Patterns",cat:"Skill Focus",diff:"Beginner",skill:"Footwork",
+    desc:"Lateral and diagonal movement patterns to the ball.",
+    tips:["Stay low","Short steps","Explode to ball"],
+    youtubeId:"R5w7dnZmC18",youtubeStart:213,youtubeEnd:273,courtType:"singles",
+    players:[{id:"A",x:50,y:92,color:BH.shotBlue}],
+    steps:[{t:"move",f:[50,92],to:[35,85],c:BH.shotBlue,note:"Lateral move"}]
+  },
+  {
+    id:"fw-low-balls",name:"Footwork: Low-Ball Movement",cat:"Skill Focus",diff:"Intermediate",skill:"Footwork",
+    desc:"Get under low balls with strong leg drive.",
+    tips:["Bend knees","Keep chest up","Drive through contact"],
+    youtubeId:"R5w7dnZmC18",youtubeStart:273,youtubeEnd:307,courtType:"singles",
+    players:[{id:"A",x:50,y:92,color:BH.shotBlue}],
+    steps:[{t:"move",f:[50,92],to:[45,88],c:BH.shotBlue,note:"Low-ball setup"}]
+  },
+  {
+    id:"tr-midcourt-attack",name:"Transition: Midcourt Attack",cat:"Skill Focus",diff:"Intermediate",skill:"Transition/Approach",
+    desc:"Attack midcourt balls and move forward.",
+    tips:["Explode forward","Stay balanced","Recover to net"],
+    youtubeId:"R5w7dnZmC18",youtubeStart:307,youtubeEnd:399,courtType:"singles",
+    players:[{id:"A",x:50,y:85,color:BH.shotBlue}],
+    steps:[
+      {t:"hit",f:[50,85],to:[72,28],c:BH.shotBlue,n:"1",shot:"forehand",hitter:"A"},
+      {t:"move",f:[50,85],to:[50,60],c:BH.shotBlue,note:"Close in"}
+    ]
+  },
+  {
+    id:"tr-abcd",name:"Transition: ABCD Combos",cat:"Skill Focus",diff:"Intermediate",skill:"Transition/Approach",
+    desc:"Build point patterns from midcourt with ABCD combos.",
+    tips:["Play with margin","Finish forward","Recover quickly"],
+    youtubeId:"R5w7dnZmC18",youtubeStart:399,youtubeEnd:429,courtType:"singles",
+    players:[{id:"A",x:50,y:85,color:BH.shotBlue}],
+    steps:[{t:"hit",f:[50,85],to:[50,28],c:BH.shotBlue,n:"1",shot:"forehand",hitter:"A"}]
+  },
+  {
+    id:"tr-tactic-game",name:"Transition: Tactics Game",cat:"Skill Focus",diff:"Intermediate",skill:"Transition/Approach",
+    desc:"Play transition points with a tactical constraint.",
+    tips:["Commit to the plan","Attack the short ball","Recover to net"],
+    youtubeId:"R5w7dnZmC18",youtubeStart:429,youtubeEnd:493,courtType:"singles",
+    players:[{id:"A",x:50,y:85,color:BH.shotBlue},{id:"B",x:50,y:15,color:BH.shotRed}],
+    steps:[
+      {t:"hit",f:[50,15],to:[50,70],c:BH.shotRed,n:"1",shot:"forehand",hitter:"B"},
+      {t:"hit",f:[50,70],to:[72,28],c:BH.shotBlue,n:"2",shot:"forehand",hitter:"A",note:"Attack"}
+    ]
+  },
+  {
+    id:"pt-x-drill",name:"Pattern: X-Drill (Zone B/C)",cat:"Skill Focus",diff:"Intermediate",skill:"Patterns",
+    desc:"Crossing pattern in the middle to build consistency.",
+    tips:["Aim big middle targets","Recover after each hit","Stay patient"],
+    youtubeId:"a-KsAAdIxP0",youtubeStart:198,youtubeEnd:229,courtType:"singles",
+    players:[{id:"A",x:50,y:90,color:BH.shotBlue},{id:"B",x:50,y:10,color:BH.shotRed}],
+    steps:[
+      {t:"hit",f:[50,90],to:[50,10],c:BH.shotBlue,n:"1",shot:"forehand",hitter:"A"},
+      {t:"hit",f:[50,10],to:[50,90],c:BH.shotRed,n:"2",shot:"forehand",hitter:"B"}
+    ]
+  },
+  {
+    id:"pt-warmup",name:"Pattern: Middle Warm-Up",cat:"Skill Focus",diff:"Beginner",skill:"Patterns",
+    desc:"Warm-up in the middle to control depth and shape.",
+    tips:["Heavy spin","Aim to the middle","Recover to center"],
+    youtubeId:"a-KsAAdIxP0",youtubeStart:229,youtubeEnd:272,courtType:"singles",
+    players:[{id:"A",x:50,y:90,color:BH.shotBlue},{id:"B",x:50,y:10,color:BH.shotRed}],
+    steps:[
+      {t:"hit",f:[50,90],to:[50,10],c:BH.shotBlue,n:"1",shot:"forehand",hitter:"A"},
+      {t:"hit",f:[50,10],to:[50,90],c:BH.shotRed,n:"2",shot:"forehand",hitter:"B"}
+    ]
+  },
+  {
+    id:"pt-middle",name:"Pattern: Play Middle (Zone B/C)",cat:"Skill Focus",diff:"Intermediate",skill:"Patterns",
+    desc:"Neutralize points by playing through the middle.",
+    tips:["Avoid the sidelines","Use height","Be consistent"],
+    youtubeId:"a-KsAAdIxP0",youtubeStart:272,youtubeEnd:404,courtType:"singles",
+    players:[{id:"A",x:50,y:90,color:BH.shotBlue},{id:"B",x:50,y:10,color:BH.shotRed}],
+    steps:[
+      {t:"hit",f:[50,90],to:[50,10],c:BH.shotBlue,n:"1",shot:"forehand",hitter:"A"},
+      {t:"hit",f:[50,10],to:[50,90],c:BH.shotRed,n:"2",shot:"forehand",hitter:"B"}
+    ]
+  },
+  {
+    id:"df-high-ball",name:"Defense: High-Ball Options",cat:"Skill Focus",diff:"Intermediate",skill:"Defense",
+    desc:"Defend high balls with smart shot selection.",
+    tips:["Create spacing","Stay tall","Reset the point"],
+    youtubeId:"5eWB8YyIz8o",youtubeStart:30,youtubeEnd:148,courtType:"singles",
+    players:[{id:"A",x:28,y:90,color:BH.shotBlue}],
+    steps:[{t:"hit",f:[28,90],to:[72,8],c:BH.shotBlue,n:"1",shot:"backhand",hitter:"A",note:"Defensive option"}]
+  },
+  {
+    id:"df-block-return",name:"Defense: Block Return",cat:"Skill Focus",diff:"Intermediate",skill:"Defense",
+    desc:"Use a block return to neutralize pace.",
+    tips:["Compact swing","Firm wrist","Aim deep middle"],
+    youtubeId:"QnKKocEn77g",youtubeStart:212,youtubeEnd:257,courtType:"singles",
+    players:[{id:"S",x:55,y:98,color:BH.shotBlue},{id:"R",x:50,y:5,color:BH.shotRed}],
+    steps:[
+      {t:"hit",f:[55,98],to:[50,22],c:BH.shotBlue,n:"1",shot:"serve",hitter:"S"},
+      {t:"hit",f:[50,5],to:[50,45],c:BH.shotRed,n:"2",shot:"backhand",hitter:"R",note:"Block"}
+    ]
+  },
+  {
+    id:"df-slice-lob",name:"Defense: Slice Lob",cat:"Skill Focus",diff:"Intermediate",skill:"Defense",
+    desc:"Use the slice lob to reset under pressure.",
+    tips:["Open face","High arc","Recover quickly"],
+    youtubeId:"Y8-_g03MEVs",youtubeStart:39,youtubeEnd:73,courtType:"singles",
+    players:[{id:"A",x:50,y:85,color:BH.shotBlue},{id:"B",x:50,y:15,color:BH.shotRed}],
+    steps:[{t:"hit",f:[50,85],to:[50,15],c:BH.shotBlue,n:"1",shot:"slice_fh",hitter:"A",note:"Defensive lob"}]
+  },
+  {
+    id:"sl-fh-lob",name:"Slice: FH Slice Lob",cat:"Skill Focus",diff:"Intermediate",skill:"Slice",
+    desc:"Forehand slice lob technique and contact.",
+    tips:["Open face","Brush under","High finish"],
+    youtubeId:"Y8-_g03MEVs",youtubeStart:39,youtubeEnd:73,courtType:"singles",
+    players:[{id:"A",x:50,y:85,color:BH.shotBlue}],
+    steps:[{t:"hit",f:[50,85],to:[50,15],c:BH.shotBlue,n:"1",shot:"slice_fh",hitter:"A"}]
+  },
+  {
+    id:"sl-bh-lob",name:"Slice: BH Slice Lob",cat:"Skill Focus",diff:"Intermediate",skill:"Slice",
+    desc:"Backhand slice lob mechanics and shape.",
+    tips:["Stable wrist","High arc","Recover to middle"],
+    youtubeId:"Y8-_g03MEVs",youtubeStart:73,youtubeEnd:131,courtType:"singles",
+    players:[{id:"A",x:28,y:85,color:BH.shotBlue}],
+    steps:[{t:"hit",f:[28,85],to:[72,15],c:BH.shotBlue,n:"1",shot:"slice_bh",hitter:"A"}]
+  },
+  {
+    id:"sl-stance",name:"Slice: Stance & Setup",cat:"Skill Focus",diff:"Beginner",skill:"Slice",
+    desc:"Use the right stance to control slice height and depth.",
+    tips:["Side-on stance","Stay low","Finish forward"],
+    youtubeId:"Y8-_g03MEVs",youtubeStart:198,youtubeEnd:248,courtType:"singles",
+    players:[{id:"A",x:28,y:85,color:BH.shotBlue}],
+    steps:[{t:"hit",f:[28,85],to:[72,15],c:BH.shotBlue,n:"1",shot:"slice_bh",hitter:"A"}]
+  },
+  {
+    id:"lob-fh-topspin",name:"Lobs: Forehand Topspin",cat:"Skill Focus",diff:"Intermediate",skill:"Lobs",
+    desc:"Lift the forehand topspin lob for defense and reset.",
+    tips:["Brush up","Aim high","Recover quickly"],
+    youtubeId:"4ybMXpEr5hg",youtubeStart:34,youtubeEnd:236,courtType:"singles",
+    players:[{id:"A",x:50,y:85,color:BH.shotBlue}],
+    steps:[{t:"hit",f:[50,85],to:[50,10],c:BH.shotBlue,n:"1",shot:"forehand",hitter:"A",note:"Topspin lob"}]
+  },
+  {
+    id:"lob-one-hand",name:"Lobs: One-Handed",cat:"Skill Focus",diff:"Intermediate",skill:"Lobs",
+    desc:"One-handed topspin lob technique.",
+    tips:["High finish","Use legs","Keep balance"],
+    youtubeId:"4ybMXpEr5hg",youtubeStart:236,youtubeEnd:382,courtType:"singles",
+    players:[{id:"A",x:28,y:85,color:BH.shotBlue}],
+    steps:[{t:"hit",f:[28,85],to:[50,10],c:BH.shotBlue,n:"1",shot:"forehand",hitter:"A",note:"One-hand lob"}]
+  },
+  {
+    id:"lob-two-hand",name:"Lobs: Two-Handed",cat:"Skill Focus",diff:"Intermediate",skill:"Lobs",
+    desc:"Two-handed topspin lob technique.",
+    tips:["Drive up","Aim deep","Recover fast"],
+    youtubeId:"4ybMXpEr5hg",youtubeStart:382,youtubeEnd:432,courtType:"singles",
+    players:[{id:"A",x:28,y:85,color:BH.shotBlue}],
+    steps:[{t:"hit",f:[28,85],to:[50,10],c:BH.shotBlue,n:"1",shot:"backhand",hitter:"A",note:"Two-hand lob"}]
+  }
+];
+const DRILL_CATS=["All",...Array.from(new Set(DRILLS.map(d=>d.cat)))];
+const DRILL_SKILLS=["All",...Array.from(new Set(DRILLS.map(d=>d.skill).filter(Boolean)))];
+
+  </script>
+  <script type="text/babel">
+// Court Components for Belmont Hill Tennis Training Web App
+// Loaded via <script type="text/babel"> - uses global variables from data.js
+
+/**
+ * Shot Type Abbreviations & Colors
+ * Used as badges on player markers, Sportplan-style
+ */
+const SHOT_INFO = {
+  forehand:  { abbr: "FH", icon: "→" },
+  backhand:  { abbr: "BH", icon: "←" },
+  serve:     { abbr: "SV", icon: "↑" },
+  fh_volley: { abbr: "FV", icon: "⤴" },
+  bh_volley: { abbr: "BV", icon: "⤵" },
+  overhead:  { abbr: "OH", icon: "⬆" },
+  slice_fh:  { abbr: "SF", icon: "↗" },
+  slice_bh:  { abbr: "SB", icon: "↖" },
+};
+
+/**
+ * PlayerIcon Component — Sportplan-style clean marker
+ *
+ * Design: Colored circle with player letter in center,
+ * small shot-type badge offset to the side when active.
+ * Clean, readable on iPad screens at any size.
+ */
+function PlayerIcon({px, py, color, label, shot, courtY}) {
+  const isFar = courtY < 50;
+  const info = shot ? SHOT_INFO[shot] : null;
+
+  // Main circle radius
+  const r = 16;
+  // Badge offset direction (show badge toward center of court for readability)
+  const badgeX = 14;
+  const badgeY = isFar ? 14 : -14;
+
+  return (
+    <g style={{transform:`translate(${px}px,${py}px)`, transition:"transform 0.4s ease-in-out"}}>
+      {/* Drop shadow for depth */}
+      <circle cx={1} cy={2} r={r} fill="rgba(0,0,0,0.25)"/>
+
+      {/* Main player circle */}
+      <circle cx={0} cy={0} r={r} fill={color} stroke={BH.white} strokeWidth={2.5}/>
+
+      {/* Player label (letter) centered */}
+      <text x={0} y={1} textAnchor="middle" dominantBaseline="middle"
+            fontSize="14" fontWeight="900" fill={BH.white}
+            style={{letterSpacing:"0.5px"}}>{label}</text>
+
+      {/* Shot-type badge when active */}
+      {info && (
+        <g>
+          <rect x={badgeX - 13} y={badgeY - 7} width={26} height={14}
+                rx={3} fill={BH.navy} stroke={BH.white} strokeWidth={1.2}/>
+          <text x={badgeX} y={badgeY + 1} textAnchor="middle" dominantBaseline="middle"
+                fontSize="8" fontWeight="bold" fill={BH.white}
+                style={{letterSpacing:"0.5px"}}>{info.abbr}</text>
+        </g>
+      )}
+
+      {/* Direction indicator - small arrow showing facing direction */}
+      {!info && (
+        <g>
+          {isFar ? (
+            <polygon points="-4,-20 4,-20 0,-25" fill={color} stroke={BH.white} strokeWidth={1} opacity={0.7}/>
+          ) : (
+            <polygon points="-4,20 4,20 0,25" fill={color} stroke={BH.white} strokeWidth={1} opacity={0.7}/>
+          )}
+        </g>
+      )}
+    </g>
+  );
+}
+
+/**
+ * Court Component
+ * Renders full tennis court SVG with white lines, service boxes, net, and overlays
+ * Displays shot arrows and player icons
+ * Now includes smooth animated transitions via SVG <animate> elements
+ */
+function Court({courtType, players, steps, activeStep, showAll}) {
+  const L = CRT.PAD, R = CRT.W - CRT.PAD, T = CRT.PAD, B = CRT.H - CRT.PAD;
+
+  // Filter visible steps
+  const vis = steps.filter((_, i) => showAll || i <= activeStep);
+
+  // Find the active hitter and their shot for PlayerIcon rendering
+  const activeS = steps[activeStep];
+  const hId = activeS && activeS.t === "hit" ? activeS.hitter : null;
+  const hShot = activeS ? activeS.shot : null;
+
+  // Arrow rendering function
+  function arrow(s, i) {
+    const x1 = mX(s.f[0]), y1 = mY(s.f[1]);
+    const x2 = mX(s.to[0]), y2 = mY(s.to[1]);
+    const isActive = i === activeStep;
+    const op = isActive ? 1 : 0.35;
+    const sw = isActive ? 3 : 1.8;
+    const col = s.c || BH.shotBlue;
+    const dashArr = s.t === "move" ? "6,4" : "none";
+    const markerId = `ah${i}`;
+
+    return (
+      <g key={i} opacity={op} style={{transition:"opacity 0.3s ease"}}>
+        <defs>
+          <marker id={markerId} markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+            <path d="M0,0 L10,4 L0,8 Z" fill={col}/>
+          </marker>
+        </defs>
+        <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={col} strokeWidth={sw}
+              markerEnd={`url(#${markerId})`} strokeDasharray={dashArr}/>
+        {/* Step number badge on arrow midpoint */}
+        {s.t === "hit" && s.n && (
+          <g>
+            <circle cx={(x1+x2)/2} cy={(y1+y2)/2} r={10} fill={BH.navy} stroke={BH.white} strokeWidth={1.5}/>
+            <text x={(x1+x2)/2} y={(y1+y2)/2+1} textAnchor="middle" dominantBaseline="middle"
+                  fontSize="9" fontWeight="bold" fill={BH.white}>{s.n}</text>
+          </g>
+        )}
+        {/* Note label on active arrow */}
+        {s.note && isActive && (
+          <text x={(x1+x2)/2} y={(y1+y2)/2 - 16} textAnchor="middle"
+                fontSize="9" fontWeight="bold" fill={BH.navy}
+                stroke={BH.white} strokeWidth={3} paintOrder="stroke">{s.note}</text>
+        )}
+      </g>
+    );
+  }
+
+  return (
+    <svg viewBox={`0 0 ${CRT.W} ${CRT.H}`}
+         style={{width:"100%", maxWidth:360, background:BH.courtDark, borderRadius:12}}>
+      {/* Court surface */}
+      <rect x={L} y={T} width={R-L} height={B-T} fill={BH.courtGreen} rx={2}/>
+
+      {/* Court outline - white */}
+      <rect x={L} y={T} width={R-L} height={B-T} fill="none" stroke={BH.white} strokeWidth={2}/>
+
+      {/* Singles sidelines */}
+      <line x1={SL.l} y1={T} x2={SL.l} y2={B} stroke={BH.white} strokeWidth={1.5}/>
+      <line x1={SL.r} y1={T} x2={SL.r} y2={B} stroke={BH.white} strokeWidth={1.5}/>
+
+      {/* Service box lines */}
+      <line x1={SL.l} y1={SVC.far} x2={SL.r} y2={SVC.far} stroke={BH.white} strokeWidth={1.5}/>
+      <line x1={SL.l} y1={SVC.near} x2={SL.r} y2={SVC.near} stroke={BH.white} strokeWidth={1.5}/>
+
+      {/* Center service line */}
+      <line x1={mX(50)} y1={SVC.far} x2={mX(50)} y2={SVC.near} stroke={BH.white} strokeWidth={1.5}/>
+
+      {/* Center marks at baselines */}
+      <line x1={mX(50)} y1={T} x2={mX(50)} y2={T+12} stroke={BH.white} strokeWidth={1.5}/>
+      <line x1={mX(50)} y1={B} x2={mX(50)} y2={B-12} stroke={BH.white} strokeWidth={1.5}/>
+
+      {/* Net with posts */}
+      <line x1={L-8} y1={NET_Y} x2={R+8} y2={NET_Y} stroke={BH.white} strokeWidth={3}/>
+      <line x1={L-8} y1={NET_Y} x2={L-8} y2={NET_Y-8} stroke={BH.white} strokeWidth={2}/>
+      <line x1={R+8} y1={NET_Y} x2={R+8} y2={NET_Y-8} stroke={BH.white} strokeWidth={2}/>
+
+      {/* Shot arrows */}
+      {vis.map((s, i) => arrow(s, i))}
+
+      {/* Player icons */}
+      {players.map(p => (
+        <PlayerIcon key={p.id}
+          px={mX(p.x)} py={mY(p.y)}
+          color={p.color} label={p.id}
+          shot={p.id === hId ? hShot : null}
+          courtY={p.y}/>
+      ))}
+    </svg>
+  );
+}
+
+  </script>
+  <script type="text/babel">
+/**
+ * Circuit Training Components
+ * Belmont Hill Tennis Training Web App
+ *
+ * Components:
+ * - CircuitRing: Circular station layout
+ * - CircuitTimer: Compact horizontal countdown timer with state machine
+ */
+
+/**
+ * CircuitRing Component
+ * Renders stations in a circle with dynamic sizing based on number of stations
+ * All stations are same color (navy). Selected station gets subtle highlight.
+ */
+function CircuitRing({stations, selectedIdx, onSelect, onRemove}) {
+  const n = stations.length;
+  if (n === 0) return (
+    <div style={{textAlign:"center", padding:"60px 20px", color:BH.g500, fontSize:"15px"}}>
+      Select exercises to build your circuit
+    </div>
+  );
+
+  const size = 520, cx = size/2, cy = size/2;
+  const rad = 200;
+  const nr = 48;
+  const fs = 11;
+
+  // Helper to wrap text into multiple lines
+  function wrapText(text, maxLen) {
+    const words = text.split(" ");
+    const lines = [];
+    let currentLine = "";
+    for (const word of words) {
+      if ((currentLine + " " + word).trim().length <= maxLen) {
+        currentLine = currentLine ? currentLine + " " + word : word;
+      } else {
+        if (currentLine) lines.push(currentLine);
+        currentLine = word;
+      }
+    }
+    if (currentLine) lines.push(currentLine);
+    return lines;
+  }
+
+  return (
+    <svg width={size} height={size} style={{display:"block", margin:"0 auto"}}>
+      {/* Connecting ring */}
+      <circle cx={cx} cy={cy} r={rad} fill="none" stroke={BH.g300} strokeWidth={1} strokeDasharray="4,3"/>
+
+      {/* Center label */}
+      <text x={cx} y={cy-6} textAnchor="middle" fontSize="13" fontWeight="bold" fill={BH.navy}>CIRCUIT</text>
+      <text x={cx} y={cy+10} textAnchor="middle" fontSize="11" fill={BH.g500}>{n} stations</text>
+
+      {/* Station nodes */}
+      {stations.map((s, i) => {
+        const ang = (i / n) * Math.PI * 2 - Math.PI / 2;
+        const x = cx + rad * Math.cos(ang);
+        const y = cy + rad * Math.sin(ang);
+        const isSelected = i === selectedIdx;
+
+        // All stations are navy, selected gets gold border
+        const fillCol = BH.navy;
+        const strokeCol = isSelected ? BH.maroon : BH.g400;
+        const strokeW = isSelected ? 3 : 1.5;
+
+        // Wrap exercise name
+        const lines = wrapText(s.name, 10);
+        const stationNum = String(i + 1);
+
+        return (
+          <g key={s.id} style={{cursor: onSelect ? "pointer" : "default"}}
+             onClick={() => onSelect && onSelect(i)}>
+            <circle cx={x} cy={y} r={nr} fill={fillCol} stroke={strokeCol} strokeWidth={strokeW}/>
+
+            {/* Station number above */}
+            <text x={x} y={y - nr - 8} textAnchor="middle" fontSize="12" fontWeight="bold"
+                  fill={BH.navy} style={{pointerEvents:"none"}}>
+              {stationNum}
+            </text>
+
+            {/* Exercise name, wrapped */}
+            {lines.length === 1 && (
+              <text x={x} y={y + 2} textAnchor="middle" dominantBaseline="middle"
+                    fontSize={fs} fontWeight="bold" fill={BH.white}
+                    style={{pointerEvents:"none"}}>{lines[0]}</text>
+            )}
+            {lines.length === 2 && (
+              <>
+                <text x={x} y={y - 4} textAnchor="middle" dominantBaseline="middle"
+                      fontSize={fs} fontWeight="bold" fill={BH.white}
+                      style={{pointerEvents:"none"}}>{lines[0]}</text>
+                <text x={x} y={y + 8} textAnchor="middle" dominantBaseline="middle"
+                      fontSize={fs} fontWeight="bold" fill={BH.white}
+                      style={{pointerEvents:"none"}}>{lines[1]}</text>
+              </>
+            )}
+            {lines.length >= 3 && (
+              <>
+                <text x={x} y={y - 8} textAnchor="middle" dominantBaseline="middle"
+                      fontSize={fs} fontWeight="bold" fill={BH.white}
+                      style={{pointerEvents:"none"}}>{lines[0]}</text>
+                <text x={x} y={y + 2} textAnchor="middle" dominantBaseline="middle"
+                      fontSize={fs} fontWeight="bold" fill={BH.white}
+                      style={{pointerEvents:"none"}}>{lines[1]}</text>
+                <text x={x} y={y + 12} textAnchor="middle" dominantBaseline="middle"
+                      fontSize={fs} fontWeight="bold" fill={BH.white}
+                      style={{pointerEvents:"none"}}>{lines[2]}</text>
+              </>
+            )}
+
+            {/* Reps/sets info below */}
+            <text x={x} y={y + nr + 12} textAnchor="middle" fontSize="9"
+                  fill={BH.g500} style={{pointerEvents:"none"}}>{s.reps || ""}</text>
+
+            {/* Remove button (admin only) */}
+            {onRemove && (
+              <g style={{cursor:"pointer"}}
+                 onClick={(e) => { e.stopPropagation(); onRemove(i); }}>
+                <circle cx={x + nr * 0.7} cy={y - nr * 0.7} r={10}
+                        fill={BH.shotRed || "#E74C3C"} stroke={BH.white} strokeWidth={1.5}/>
+                <text x={x + nr * 0.7} y={y - nr * 0.7 + 1} textAnchor="middle"
+                      dominantBaseline="middle" fontSize="13" fontWeight="bold"
+                      fill={BH.white} style={{pointerEvents:"none"}}>×</text>
+              </g>
+            )}
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+/**
+ * CircuitTimer Component
+ * Compact horizontal countdown timer with state machine for circuit training
+ * States: idle → station → rest → (loop) or done
+ * Renders as a compact toolbar-style timer bar (~70px height)
+ */
+function CircuitTimer({work, rest, rounds, exercises, onStation, onPhaseInfo}) {
+  const [phase, setPhase] = React.useState("idle");  // idle, station, rest, pausedStation, pausedRest, done
+  const [time, setTime] = React.useState(0);
+  const [stIdx, setStIdx] = React.useState(0);
+  const [round, setRound] = React.useState(1);
+  const timerRef = React.useRef(null);
+
+  const totalStations = exercises.length;
+  const dur = phase === "station" || phase === "pausedStation" ? work : phase === "rest" || phase === "pausedRest" ? rest : 0;
+
+  // Reset everything when exercises change
+  React.useEffect(() => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    timerRef.current = null;
+    setPhase("idle");
+    setTime(0);
+    setStIdx(0);
+    setRound(1);
+  }, [exercises.length]);
+
+  // Expose phase info to parent
+  React.useEffect(() => {
+    if (onPhaseInfo) {
+      onPhaseInfo({
+        phase,
+        time,
+        round,
+        stIdx,
+        remaining: Math.max(0, dur - time),
+        totalStations,
+        rounds
+      });
+    }
+  }, [phase, time, round, stIdx, dur, totalStations, rounds, onPhaseInfo]);
+
+  const tick = React.useCallback(() => {
+    setTime(t => {
+      if (t + 1 >= dur) {
+        // Time's up for this phase
+        if (phase === "station") {
+          // Check if last station in round
+          setStIdx(si => {
+            if (si + 1 >= totalStations) {
+              // End of round
+              setRound(r => {
+                if (r >= rounds) {
+                  // All done!
+                  setPhase("done");
+                  snd.done();
+                  if (timerRef.current) clearInterval(timerRef.current);
+                  timerRef.current = null;
+                  return r;
+                }
+                // Next round - go to rest
+                snd.rest();
+                setPhase("rest");
+                return r;
+              });
+              return si;
+            }
+            // Next station, but rest first
+            snd.rest();
+            setPhase("rest");
+            return si;
+          });
+        } else if (phase === "rest") {
+          // Move to next station
+          setStIdx(si => {
+            let nextSi = si + 1;
+            if (nextSi >= totalStations) {
+              // New round
+              nextSi = 0;
+              setRound(r => r + 1);
+            }
+            if (onStation) onStation(nextSi);
+            return nextSi;
+          });
+          snd.go();
+          setPhase("station");
+        }
+        return 0;
+      }
+      // 3-second warning ticks
+      if (dur - (t + 1) <= 3 && dur - (t + 1) > 0) snd.tick();
+      return t + 1;
+    });
+  }, [phase, dur, totalStations, rounds, onStation]);
+
+  // Run timer
+  React.useEffect(() => {
+    if (phase === "station" || phase === "rest") {
+      timerRef.current = setInterval(tick, 1000);
+      return () => {
+        if (timerRef.current) clearInterval(timerRef.current);
+      };
+    }
+  }, [phase, tick]);
+
+  function start() {
+    setPhase("station");
+    setTime(0);
+    setStIdx(0);
+    setRound(1);
+    if (onStation) onStation(0);
+    snd.go();
+  }
+
+  function pause() {
+    if (timerRef.current) clearInterval(timerRef.current);
+    timerRef.current = null;
+    setPhase(p => p === "station" ? "pausedStation" : p === "rest" ? "pausedRest" : p);
+  }
+
+  function resume() {
+    setPhase(p => p === "pausedStation" ? "station" : p === "pausedRest" ? "rest" : p);
+  }
+
+  function reset() {
+    if (timerRef.current) clearInterval(timerRef.current);
+    timerRef.current = null;
+    setPhase("idle");
+    setTime(0);
+    setStIdx(0);
+    setRound(1);
+    if (onStation) onStation(-1);
+  }
+
+  const remaining = Math.max(0, dur - time);
+  const isRunning = phase === "station" || phase === "rest";
+  const isPaused = phase === "pausedStation" || phase === "pausedRest";
+  const isWork = phase === "station" || phase === "pausedStation";
+  const col = isWork ? BH.shotBlue : BH.shotGold;
+
+  return (
+    <div style={{
+      display: "flex",
+      alignItems: "center",
+      gap: "16px",
+      padding: "8px 16px",
+      background: BH.g100,
+      borderRadius: "8px",
+      minHeight: "70px",
+      fontSize: "14px",
+      fontFamily: "system-ui, -apple-system, sans-serif"
+    }}>
+      {/* Countdown number - big and bold */}
+      <div style={{
+        fontSize: "42px",
+        fontWeight: "bold",
+        color: phase === "idle" ? BH.g400 : col,
+        minWidth: "80px",
+        textAlign: "center",
+        fontVariantNumeric: "tabular-nums"
+      }}>
+        {phase === "idle" ? "—" : phase === "done" ? "✓" : remaining}
+      </div>
+
+      {/* Divider */}
+      <div style={{width: "1px", height: "50px", background: BH.g300}} />
+
+      {/* Phase label and info */}
+      <div style={{flex: 1}}>
+        {phase === "idle" && (
+          <div style={{color: BH.g500, fontSize: "13px"}}>Ready to start</div>
+        )}
+        {phase === "done" && (
+          <div style={{fontWeight: "bold", color: BH.maroon}}>CIRCUIT COMPLETE!</div>
+        )}
+        {(phase === "station" || phase === "pausedStation") && (
+          <>
+            <div style={{fontWeight: "bold", color: BH.shotBlue, marginBottom: "2px"}}>WORK</div>
+            <div style={{fontSize: "12px", color: BH.g500}}>
+              Round {round}/{rounds} • Station {stIdx + 1}/{totalStations}
+            </div>
+          </>
+        )}
+        {(phase === "rest" || phase === "pausedRest") && (
+          <>
+            <div style={{fontWeight: "bold", color: BH.shotGold, marginBottom: "2px"}}>REST</div>
+            <div style={{fontSize: "12px", color: BH.g500}}>
+              Round {round}/{rounds} • Next: Station {(stIdx + 1) % totalStations + 1}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Control buttons */}
+      <div style={{display: "flex", gap: "8px"}}>
+        {phase === "idle" && (
+          <button onClick={start} style={{
+            padding: "8px 16px",
+            background: BH.shotBlue,
+            color: BH.white,
+            border: "none",
+            borderRadius: "4px",
+            cursor: "pointer",
+            fontSize: "13px",
+            fontWeight: "bold",
+            whiteSpace: "nowrap"
+          }}>
+            START
+          </button>
+        )}
+        {isRunning && (
+          <button onClick={pause} style={{
+            padding: "8px 14px",
+            background: BH.shotGold,
+            color: BH.navy,
+            border: "none",
+            borderRadius: "4px",
+            cursor: "pointer",
+            fontSize: "13px",
+            fontWeight: "bold",
+            whiteSpace: "nowrap"
+          }}>
+            PAUSE
+          </button>
+        )}
+        {isPaused && (
+          <button onClick={resume} style={{
+            padding: "8px 14px",
+            background: BH.shotBlue,
+            color: BH.white,
+            border: "none",
+            borderRadius: "4px",
+            cursor: "pointer",
+            fontSize: "13px",
+            fontWeight: "bold",
+            whiteSpace: "nowrap"
+          }}>
+            RESUME
+          </button>
+        )}
+        {(isRunning || isPaused || phase === "done") && (
+          <button onClick={reset} style={{
+            padding: "8px 14px",
+            background: BH.g400,
+            color: BH.white,
+            border: "none",
+            borderRadius: "4px",
+            cursor: "pointer",
+            fontSize: "13px",
+            fontWeight: "bold",
+            whiteSpace: "nowrap"
+          }}>
+            RESET
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+  </script>
+  <script type="text/babel">
+// DrillViewer Component
+function DrillViewer({drill}) {
+  const [step, setStep] = React.useState(-1);
+  const [playing, setPlaying] = React.useState(false);
+  const [showAll, setShowAll] = React.useState(false);
+  const tmr = React.useRef(null);
+
+  // Reset when drill changes
+  React.useEffect(() => {
+    setStep(-1);
+    setPlaying(false);
+    setShowAll(false);
+  }, [drill && drill.id]);
+
+  // Auto-play timer
+  React.useEffect(() => {
+    if (!playing || !drill) return;
+    tmr.current = setInterval(() => {
+      setStep(s => {
+        if (s >= drill.steps.length - 1) {
+          setPlaying(false);
+          return s;
+        }
+        return s + 1;
+      });
+    }, 1200);
+    return () => clearInterval(tmr.current);
+  }, [playing, drill]);
+
+  if (!drill) return null;
+  const steps = drill.steps || [];
+  const maxStep = steps.length - 1;
+
+  // Button style helper
+  const btn = (bg, small) => ({
+    padding: small ? "6px 10px" : "8px 14px",
+    background: bg,
+    color: BH.white,
+    border: "none",
+    borderRadius: "6px",
+    cursor: "pointer",
+    fontSize: small ? "12px" : "13px",
+    fontWeight: "bold",
+    flex: small ? undefined : 1,
+  });
+
+  return (
+    <div style={{display:"flex", flexDirection:"column", gap:"12px"}}>
+      {/* Court visualization */}
+      <Court
+        courtType={drill.courtType}
+        players={drill.players}
+        steps={steps}
+        activeStep={step}
+        showAll={showAll}
+      />
+
+      {/* Step counter */}
+      <div style={{textAlign:"center", fontSize:"13px", color:BH.g700, fontWeight:"bold"}}>
+        Step {Math.max(0, step) + 1} / {steps.length}
+        {showAll && <span style={{color:BH.maroon, marginLeft:"8px"}}>(All visible)</span>}
+      </div>
+
+      {/* Playback controls */}
+      <div style={{display:"flex", gap:"6px", flexWrap:"wrap", justifyContent:"center"}}>
+        <button onClick={() => { setStep(-1); setPlaying(false); setShowAll(false); }} style={btn(BH.g500)}>
+          Reset
+        </button>
+        <button onClick={() => setStep(s => Math.max(-1, s - 1))} style={btn(BH.navy)}
+                disabled={step <= -1}>
+          ← Back
+        </button>
+        <button onClick={() => {
+          if (playing) { setPlaying(false); }
+          else { if (step >= maxStep) setStep(-1); setPlaying(true); }
+        }} style={btn(playing ? BH.shotRed : BH.shotBlue)}>
+          {playing ? "⏸ Pause" : "▶ Play"}
+        </button>
+        <button onClick={() => setStep(s => Math.min(maxStep, s + 1))} style={btn(BH.navy)}
+                disabled={step >= maxStep}>
+          Next →
+        </button>
+        <button onClick={() => { setShowAll(!showAll); setStep(maxStep); }} style={btn(BH.maroon)}>
+          {showAll ? "Step View" : "Show All"}
+        </button>
+      </div>
+
+      {/* Step-by-step breakdown */}
+      <div style={{background:BH.white, padding:"12px 16px", borderRadius:"8px", border:`1px solid ${BH.g300}`}}>
+        <div style={{fontSize:"12px", fontWeight:"bold", color:BH.navy, marginBottom:"8px"}}>
+          Step Breakdown
+        </div>
+        {steps.map((s, i) => {
+          const isActive = i === step;
+          const isPast = i < step;
+          const desc = s.t === "hit"
+            ? `${s.hitter} hits ${(s.shot||"").replace(/_/g," ")}${s.note ? " — "+s.note : ""}`
+            : `Player moves${s.note ? " — "+s.note : " to position"}`;
+          return (
+            <div key={i} style={{
+              padding:"6px 10px", marginBottom:"2px", borderRadius:"4px", fontSize:"12px",
+              display:"flex", gap:"8px", alignItems:"center",
+              background: isActive ? BH.maroon : "transparent",
+              color: isActive ? BH.white : isPast ? BH.g400 : BH.g700,
+              fontWeight: isActive ? "bold" : "normal",
+              transition: "all 0.2s"
+            }}>
+              <span style={{minWidth:"20px", fontWeight:"bold", color: isActive ? BH.white : BH.g400}}>
+                {s.t === "hit" ? s.n : "·"}
+              </span>
+              <span>{desc}</span>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Coaching tips */}
+      {drill.tips && drill.tips.length > 0 && (
+        <div style={{background:BH.white, padding:"14px 16px", borderRadius:"8px", border:`1px solid ${BH.g300}`}}>
+          <div style={{fontSize:"12px", fontWeight:"bold", color:BH.navy, marginBottom:"6px"}}>
+            Coaching Tips
+          </div>
+          <ul style={{margin:0, paddingLeft:"18px", fontSize:"12px", color:BH.g700, lineHeight:"1.7"}}>
+            {drill.tips.map((t, i) => <li key={i}>{t}</li>)}
+          </ul>
+        </div>
+      )}
+
+      {/* YouTube embed with timestamp support */}
+      {drill.youtubeId && (
+        <div style={{borderRadius:"8px", overflow:"hidden", border:`1px solid ${BH.g300}`}}>
+          <div style={{padding:"8px 12px", background:BH.navy, display:"flex", alignItems:"center", gap:"8px"}}>
+            <span style={{fontSize:"12px", fontWeight:"bold", color:BH.white}}>Video Demo</span>
+            {(drill.youtubeStart || drill.youtubeEnd) && (
+              <span style={{fontSize:"10px", color:BH.maroon, opacity:0.8}}>
+                {drill.youtubeStart ? `from ${Math.floor(drill.youtubeStart/60)}:${String(drill.youtubeStart%60).padStart(2,"0")}` : ""}
+                {drill.youtubeEnd ? ` to ${Math.floor(drill.youtubeEnd/60)}:${String(drill.youtubeEnd%60).padStart(2,"0")}` : ""}
+              </span>
+            )}
+          </div>
+          <div style={{position:"relative", paddingBottom:"56.25%", height:0, overflow:"hidden"}}>
+            <iframe
+              src={`https://www.youtube.com/embed/${drill.youtubeId}?${drill.youtubeStart ? "start="+drill.youtubeStart : ""}${drill.youtubeEnd ? "&end="+drill.youtubeEnd : ""}&rel=0&modestbranding=1`}
+              frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope"
+              allowFullScreen style={{position:"absolute", top:0, left:0, width:"100%", height:"100%"}}/>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// LoginModal Component
+function LoginModal({onLogin, onClose}) {
+  const [un, setUn] = React.useState("");
+  const [pw, setPw] = React.useState("");
+  const [err, setErr] = React.useState("");
+
+  const handleLogin = async () => {
+    if (!un.trim() || !pw.trim()) { setErr("Enter username and password"); return; }
+    const pwh = await sha256(pw);
+    if (un === "BHTennis" && pwh === "b58f004c95d0a0c859256c96ac33f70e5ccc9cadaf17997425f883bbcbb6cfdd") {
+      setErr("");
+      onLogin();
+    } else {
+      setErr("Invalid credentials");
+    }
+  };
+
+  return (
+    <div style={{position:"fixed", top:0, left:0, right:0, bottom:0, background:"rgba(0,0,0,0.5)",
+                 display:"flex", alignItems:"center", justifyContent:"center", zIndex:1000}}>
+      <div style={{background:BH.white, padding:"32px", borderRadius:"12px", width:"100%", maxWidth:"340px",
+                   boxShadow:"0 10px 40px rgba(0,0,0,0.2)"}}>
+        <div style={{textAlign:"center", marginBottom:"20px"}}>
+          <div style={{fontSize:"20px", fontWeight:"bold", color:BH.navy}}>Admin Login</div>
+          <div style={{fontSize:"12px", color:BH.g500, marginTop:"4px"}}>Belmont Hill Tennis</div>
+        </div>
+        <input type="text" placeholder="Username" value={un} onChange={e => setUn(e.target.value)}
+          style={{width:"100%", padding:"10px 12px", marginBottom:"12px", border:`1px solid ${BH.g300}`,
+                  borderRadius:"6px", fontSize:"14px", boxSizing:"border-box"}}
+          onKeyDown={e => e.key === "Enter" && handleLogin()}/>
+        <input type="password" placeholder="Password" value={pw} onChange={e => setPw(e.target.value)}
+          style={{width:"100%", padding:"10px 12px", marginBottom:"12px", border:`1px solid ${BH.g300}`,
+                  borderRadius:"6px", fontSize:"14px", boxSizing:"border-box"}}
+          onKeyDown={e => e.key === "Enter" && handleLogin()}/>
+        {err && <div style={{color:BH.shotRed, fontSize:"12px", marginBottom:"12px", textAlign:"center"}}>{err}</div>}
+        <div style={{display:"flex", gap:"8px"}}>
+          <button onClick={handleLogin} style={{flex:1, padding:"10px", background:BH.navy, color:BH.white,
+            border:"none", borderRadius:"6px", cursor:"pointer", fontWeight:"bold", fontSize:"14px"}}>Login</button>
+          <button onClick={onClose} style={{flex:1, padding:"10px", background:BH.g300, color:BH.navy,
+            border:"none", borderRadius:"6px", cursor:"pointer", fontSize:"14px"}}>Cancel</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// App Component
+function App() {
+  const [tab, setTab] = React.useState("circuits");
+  const [admin, setAdmin] = React.useState(false);
+  const [showLogin, setShowLogin] = React.useState(false);
+
+  // Published plan state
+  const [pubDrills, setPubDrills] = React.useState([]);
+  const [pubExercises, setPubExercises] = React.useState([]);
+  const [work, setWork] = React.useState(45);
+  const [rest, setRest] = React.useState(15);
+  const [rounds, setRounds] = React.useState(3);
+
+  // Admin selection state
+  const [selDrills, setSelDrills] = React.useState([]);
+  const [selExercises, setSelExercises] = React.useState([]);
+
+  // UI state
+  const [drCat, setDrCat] = React.useState("All");
+  const [drSkill, setDrSkill] = React.useState("All");
+  const [exCat, setExCat] = React.useState("All");
+  const [viewDrill, setViewDrill] = React.useState(null);
+  const [practiceMode, setPracticeMode] = React.useState(false);
+  const [pmIdx, setPmIdx] = React.useState(0);
+  const [toast, setToast] = React.useState("");
+  const [circuitStIdx, setCircuitStIdx] = React.useState(-1);
+
+  // Load config on mount
+  React.useEffect(() => {
+    let cfg = null;
+    const h = window.location.hash.substring(1);
+    if (h.startsWith("config=")) {
+      try { cfg = JSON.parse(atob(h.slice(7))); } catch(e) {}
+    }
+    if (!cfg) {
+      const lc = localStorage.getItem("bh-tennis-published");
+      if (lc) try { cfg = JSON.parse(lc); } catch(e) {}
+    }
+    if (cfg) {
+      setPubDrills(cfg.drills || []);
+      setPubExercises(cfg.exercises || []);
+      setSelDrills(cfg.drills || []);
+      setSelExercises(cfg.exercises || []);
+      setWork(cfg.work || 45);
+      setRest(cfg.rest || 15);
+      setRounds(cfg.rounds || 3);
+    }
+    if (sessionStorage.getItem("bh-admin")) setAdmin(true);
+  }, []);
+
+  // Login/logout handlers
+  const handleLogin = () => { setShowLogin(false); setAdmin(true); sessionStorage.setItem("bh-admin","1"); };
+  const handleLogout = () => { setAdmin(false); sessionStorage.removeItem("bh-admin"); };
+
+  // Publish handler
+  const handlePublish = () => {
+    const cfg = { drills: selDrills, exercises: selExercises, work, rest, rounds };
+    localStorage.setItem("bh-tennis-published", JSON.stringify(cfg));
+    setPubDrills(selDrills);
+    setPubExercises(selExercises);
+    const url = window.location.origin + window.location.pathname + "#config=" + btoa(JSON.stringify(cfg));
+    navigator.clipboard.writeText(url).then(() => {
+      setToast("Plan published! Link copied to clipboard.");
+      setTimeout(() => setToast(""), 3000);
+    });
+  };
+
+  // Toggle drill selection (admin)
+  const toggleDrill = (id) => {
+    setSelDrills(sel => sel.includes(id) ? sel.filter(x => x !== id) : [...sel, id]);
+  };
+
+  // Toggle exercise selection (admin)
+  const toggleExercise = (id) => {
+    setSelExercises(sel => sel.includes(id) ? sel.filter(x => x !== id) : [...sel, id]);
+  };
+
+  // Filtered lists for admin category browsing
+  const filteredDrills = DRILLS.filter(d =>
+    (drCat === "All" || d.cat === drCat) &&
+    (drSkill === "All" || d.skill === drSkill)
+  );
+  const filteredExercises = exCat === "All" ? EXERCISES : EXERCISES.filter(e => e.cat === exCat);
+
+  // The drill list that non-admin players see (only published drills, in order)
+  const playerDrills = pubDrills.map(id => DRILLS.find(d => d.id === id)).filter(Boolean);
+
+  // The exercise list for non-admin
+  const playerExercises = pubExercises.map(id => EXERCISES.find(e => e.id === id)).filter(Boolean);
+
+  // Current drill for viewer
+  const currentViewDrill = viewDrill ? DRILLS.find(d => d.id === viewDrill) : null;
+
+  // Practice mode drill
+  const pmDrills = admin ? selDrills.map(id => DRILLS.find(d => d.id === id)).filter(Boolean) : playerDrills;
+  const pmDrill = pmDrills[pmIdx];
+
+  // Admin's selected exercises for circuit
+  const adminExercises = selExercises.map(id => EXERCISES.find(e => e.id === id)).filter(Boolean);
+
+  // Circuit exercises to display
+  const circuitExercises = admin ? adminExercises : playerExercises;
+
+  // Auto-select first drill when view drill is null
+  React.useEffect(() => {
+    if (!viewDrill) {
+      if (admin && selDrills.length > 0) setViewDrill(selDrills[0]);
+      else if (!admin && playerDrills.length > 0) setViewDrill(playerDrills[0].id);
+    }
+  }, [admin, selDrills, playerDrills.length]);
+
+  // --- RENDER ---
+
+  // Button style helpers
+  const tabBtn = (active) => ({
+    padding:"10px 24px", background:active?BH.navy:BH.g200, color:active?BH.white:BH.navy,
+    border:"none", borderRadius:"6px", cursor:"pointer", fontWeight:"bold", fontSize:"14px"
+  });
+
+  const catBtn = (active) => ({
+    padding:"6px 12px", background:active?BH.navy:BH.g100, color:active?BH.white:BH.navy,
+    border:`1px solid ${active?BH.navy:BH.g300}`, borderRadius:"4px", cursor:"pointer", fontSize:"12px"
+  });
+
+  return (
+    <div style={{minHeight:"100vh", background:BH.offWhite}}>
+      {/* Header */}
+      <header style={{background:BH.navy, color:BH.white, padding:"16px 24px", display:"flex",
+                      justifyContent:"space-between", alignItems:"center",
+                      boxShadow:"0 2px 8px rgba(0,0,0,0.15)"}}>
+        <div>
+          <div style={{fontSize:"20px", fontWeight:"normal", color:BH.white, letterSpacing:"3.5px",
+                      fontFamily:"Georgia, 'Times New Roman', serif"}}>BELMONT HILL</div>
+          <div style={{fontSize:"12px", opacity:0.85, letterSpacing:"1px"}}>Varsity Tennis</div>
+        </div>
+        <div style={{display:"flex", gap:"12px", alignItems:"center"}}>
+          {admin ? (
+            <>
+              <span style={{fontSize:"11px", background:BH.maroon, color:BH.white, padding:"4px 10px",
+                            borderRadius:"4px", fontWeight:"bold"}}>ADMIN</span>
+              <button onClick={handlePublish} style={{padding:"8px 14px", background:BH.maroon, color:BH.white,
+                border:"none", borderRadius:"6px", cursor:"pointer", fontSize:"12px", fontWeight:"bold"}}>
+                Publish Plan
+              </button>
+              <button onClick={handleLogout} style={{padding:"8px 14px", background:"rgba(255,255,255,0.15)",
+                color:BH.white, border:"none", borderRadius:"6px", cursor:"pointer", fontSize:"12px"}}>
+                Logout
+              </button>
+            </>
+          ) : (
+            <button onClick={() => setShowLogin(true)} style={{fontSize:"16px", background:"none",
+              border:"none", cursor:"pointer", color:BH.white, opacity:0.6, padding:"4px"}}>
+              🔒
+            </button>
+          )}
+        </div>
+      </header>
+
+      {/* Tab bar */}
+      <div style={{display:"flex", justifyContent:"center", gap:"12px", padding:"16px",
+                   background:BH.white, borderBottom:`1px solid ${BH.g300}`}}>
+        <button onClick={() => { setTab("circuits"); setPracticeMode(false); }} style={tabBtn(tab==="circuits")}>
+          Circuits
+        </button>
+        <button onClick={() => { setTab("drills"); setPracticeMode(false); }} style={tabBtn(tab==="drills")}>
+          Drills
+        </button>
+      </div>
+
+      {/* Login modal */}
+      {showLogin && <LoginModal onLogin={handleLogin} onClose={() => setShowLogin(false)}/>}
+
+      {/* Toast */}
+      {toast && (
+        <div style={{position:"fixed", bottom:"20px", right:"20px", background:BH.navy, color:BH.white,
+                     padding:"12px 20px", borderRadius:"8px", zIndex:500, fontSize:"13px",
+                     boxShadow:"0 4px 12px rgba(0,0,0,0.2)"}}>{toast}</div>
+      )}
+
+      {/* Main content */}
+      <div style={{maxWidth:"1200px", margin:"0 auto", padding:"20px"}}>
+
+        {/* ===== DRILLS TAB ===== */}
+        {tab === "drills" && (
+          practiceMode && pmDrills.length > 0 ? (
+            /* Practice Mode */
+            <div>
+              <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"16px"}}>
+                <button onClick={() => setPracticeMode(false)} style={{padding:"8px 16px", background:BH.navy,
+                  color:BH.white, border:"none", borderRadius:"6px", cursor:"pointer", fontSize:"13px"}}>
+                  ← Back to Plan
+                </button>
+                <div style={{fontSize:"13px", color:BH.g700, fontWeight:"bold"}}>
+                  Drill {pmIdx+1} of {pmDrills.length}: {pmDrill && pmDrill.name}
+                </div>
+              </div>
+              {pmDrill && <DrillViewer drill={pmDrill}/>}
+              <div style={{display:"flex", gap:"8px", marginTop:"16px"}}>
+                <button onClick={() => setPmIdx(Math.max(0, pmIdx-1))} disabled={pmIdx<=0}
+                  style={{flex:1, padding:"12px", background:pmIdx<=0?BH.g300:BH.navy, color:BH.white,
+                    border:"none", borderRadius:"6px", cursor:"pointer", fontSize:"14px", fontWeight:"bold"}}>
+                  ← Previous Drill
+                </button>
+                <button onClick={() => setPmIdx(Math.min(pmDrills.length-1, pmIdx+1))} disabled={pmIdx>=pmDrills.length-1}
+                  style={{flex:1, padding:"12px", background:pmIdx>=pmDrills.length-1?BH.g300:BH.navy, color:BH.white,
+                    border:"none", borderRadius:"6px", cursor:"pointer", fontSize:"14px", fontWeight:"bold"}}>
+                  Next Drill →
+                </button>
+              </div>
+            </div>
+          ) : (
+            /* Normal Drills View */
+            <div style={{display:"flex", gap:"20px"}}>
+              {/* Left sidebar */}
+              <div style={{width:"300px", flexShrink:0}}>
+
+                {admin ? (
+                  /* Admin: category filter + drill list with checkboxes + today's plan summary */
+                  <>
+                    {/* Skill filter */}
+                    <div style={{display:"flex", flexWrap:"wrap", gap:"6px", marginBottom:"10px"}}>
+                      {DRILL_SKILLS.map(s => (
+                        <button key={s} onClick={() => setDrSkill(s)} style={catBtn(drSkill===s)}>{s}</button>
+                      ))}
+                    </div>
+
+                    {/* Category filter */}
+                    <div style={{display:"flex", flexWrap:"wrap", gap:"6px", marginBottom:"16px"}}>
+                      {DRILL_CATS.map(c => (
+                        <button key={c} onClick={() => setDrCat(c)} style={catBtn(drCat===c)}>{c}</button>
+                      ))}
+                    </div>
+
+                    {/* Drill list with checkboxes */}
+                    <div style={{background:BH.white, borderRadius:"8px", border:`1px solid ${BH.g300}`,
+                                 maxHeight:"350px", overflowY:"auto"}}>
+                      <div style={{padding:"12px 14px", borderBottom:`1px solid ${BH.g200}`,
+                                   fontSize:"13px", fontWeight:"bold", color:BH.navy}}>
+                        All Drills
+                      </div>
+                      {filteredDrills.map(d => (
+                        <div key={d.id} style={{padding:"8px 14px", display:"flex", gap:"8px", alignItems:"center",
+                          cursor:"pointer", borderBottom:`1px solid ${BH.g100}`,
+                          background:viewDrill===d.id ? `rgba(59,130,246,0.08)` : "transparent"}}
+                          onClick={() => setViewDrill(d.id)}>
+                          <input type="checkbox" checked={selDrills.includes(d.id)}
+                            onChange={(e) => { e.stopPropagation(); toggleDrill(d.id); }}
+                            style={{cursor:"pointer", accentColor:BH.navy}}/>
+                          <div style={{flex:1}}>
+                            <div style={{fontSize:"12px", fontWeight:"bold", color:BH.navy}}>{d.name}</div>
+                            <div style={{fontSize:"10px", color:BH.g500}}>{d.skill || d.cat} • {d.diff}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Today's Plan summary */}
+                    <div style={{background:BH.white, borderRadius:"8px", border:`2px solid ${BH.maroon}`,
+                                 marginTop:"16px", overflow:"hidden"}}>
+                      <div style={{padding:"10px 14px", background:BH.maroon, color:BH.white,
+                                   fontSize:"13px", fontWeight:"bold"}}>
+                        Today's Plan ({selDrills.length} drills)
+                      </div>
+                      <div style={{padding:"8px 14px", maxHeight:"200px", overflowY:"auto"}}>
+                        {selDrills.length === 0 ? (
+                          <div style={{fontSize:"12px", color:BH.g500, padding:"8px 0"}}>
+                            Check drills above to build today's plan
+                          </div>
+                        ) : (
+                          selDrills.map((id, i) => {
+                            const d = DRILLS.find(dr => dr.id === id);
+                            if (!d) return null;
+                            return (
+                              <div key={id} style={{display:"flex", gap:"8px", alignItems:"center", padding:"4px 0",
+                                borderBottom:i < selDrills.length-1 ? `1px solid ${BH.g100}` : "none"}}>
+                                <span style={{fontSize:"11px", fontWeight:"bold", color:BH.maroon, minWidth:"18px"}}>{i+1}.</span>
+                                <span style={{fontSize:"12px", color:BH.navy}}>{d.name}</span>
+                                <button onClick={() => toggleDrill(id)} style={{marginLeft:"auto", background:"none",
+                                  border:"none", cursor:"pointer", fontSize:"14px", color:BH.g400, padding:"0 2px"}}>×</button>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  /* Non-Admin: Today's Plan (read-only numbered list) */
+                  <div style={{background:BH.white, borderRadius:"8px", border:`2px solid ${BH.maroon}`, overflow:"hidden"}}>
+                    <div style={{padding:"12px 16px", background:BH.maroon, color:BH.white}}>
+                      <div style={{fontSize:"15px", fontWeight:"bold"}}>Today's Plan</div>
+                      <div style={{fontSize:"11px", opacity:0.8}}>{playerDrills.length} drills</div>
+                    </div>
+                    <div style={{padding:"8px 0"}}>
+                      {playerDrills.length === 0 ? (
+                        <div style={{padding:"20px 16px", textAlign:"center", fontSize:"13px", color:BH.g500}}>
+                          No drills published yet. Check back later!
+                        </div>
+                      ) : (
+                        playerDrills.map((d, i) => (
+                          <div key={d.id} onClick={() => setViewDrill(d.id)}
+                            style={{padding:"10px 16px", display:"flex", gap:"10px", alignItems:"center",
+                              cursor:"pointer", borderBottom:`1px solid ${BH.g100}`,
+                              background:viewDrill===d.id ? `rgba(201,162,39,0.12)` : "transparent"}}>
+                            <span style={{fontSize:"14px", fontWeight:"bold", color:BH.maroon, minWidth:"24px"}}>{i+1}</span>
+                            <div>
+                              <div style={{fontSize:"13px", fontWeight:"bold", color:BH.navy}}>{d.name}</div>
+                              <div style={{fontSize:"11px", color:BH.g500}}>{d.desc}</div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                    {playerDrills.length > 0 && (
+                      <div style={{padding:"12px 16px", borderTop:`1px solid ${BH.g200}`}}>
+                        <button onClick={() => { setPracticeMode(true); setPmIdx(0); }}
+                          style={{width:"100%", padding:"12px", background:BH.navy, color:BH.white,
+                            border:"none", borderRadius:"6px", cursor:"pointer", fontSize:"14px", fontWeight:"bold"}}>
+                          ▶ Practice Mode
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Right: Drill Viewer */}
+              <div style={{flex:1, minWidth:0}}>
+                {currentViewDrill ? (
+                  <DrillViewer drill={currentViewDrill}/>
+                ) : (
+                  <div style={{textAlign:"center", padding:"60px 20px", color:BH.g500}}>
+                    {admin ? "Select a drill to preview" : "Select a drill from today's plan"}
+                  </div>
+                )}
+              </div>
+            </div>
+          )
+        )}
+
+        {/* ===== CIRCUITS TAB ===== */}
+        {tab === "circuits" && (
+          <div style={{display:"flex", gap:"20px"}}>
+            {/* Left sidebar */}
+            <div style={{width:"300px", flexShrink:0}}>
+              {admin ? (
+                /* Admin: category filter + exercise list + settings */
+                <>
+                  <div style={{display:"flex", flexWrap:"wrap", gap:"6px", marginBottom:"16px"}}>
+                    {EX_CATS.map(c => (
+                      <button key={c} onClick={() => setExCat(c)} style={catBtn(exCat===c)}>{c}</button>
+                    ))}
+                  </div>
+
+                  <div style={{background:BH.white, borderRadius:"8px", border:`1px solid ${BH.g300}`,
+                               maxHeight:"350px", overflowY:"auto"}}>
+                    <div style={{padding:"12px 14px", borderBottom:`1px solid ${BH.g200}`,
+                                 fontSize:"13px", fontWeight:"bold", color:BH.navy}}>
+                      Exercises
+                    </div>
+                    {filteredExercises.map(e => (
+                      <div key={e.id} style={{padding:"8px 14px", display:"flex", gap:"8px", alignItems:"center",
+                        cursor:"pointer", borderBottom:`1px solid ${BH.g100}`}}
+                        onClick={() => toggleExercise(e.id)}>
+                        <input type="checkbox" checked={selExercises.includes(e.id)}
+                          onChange={() => {}} style={{cursor:"pointer", accentColor:BH.navy}}/>
+                        <div style={{flex:1}}>
+                          <div style={{fontSize:"12px", fontWeight:"bold", color:BH.navy}}>{e.name}</div>
+                          <div style={{fontSize:"10px", color:BH.g500}}>{e.cat} • {e.reps}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Timer settings */}
+                  <div style={{background:BH.white, borderRadius:"8px", border:`1px solid ${BH.g300}`,
+                               marginTop:"16px", padding:"14px"}}>
+                    <div style={{fontSize:"13px", fontWeight:"bold", color:BH.navy, marginBottom:"10px"}}>
+                      Timer Settings
+                    </div>
+                    <div style={{display:"flex", flexDirection:"column", gap:"8px"}}>
+                      <label style={{fontSize:"12px", color:BH.g700, display:"flex", justifyContent:"space-between", alignItems:"center"}}>
+                        Work (sec)
+                        <input type="number" value={work} onChange={e => setWork(+e.target.value)}
+                          style={{width:"60px", padding:"4px 8px", border:`1px solid ${BH.g300}`, borderRadius:"4px"}} min="10" max="120"/>
+                      </label>
+                      <label style={{fontSize:"12px", color:BH.g700, display:"flex", justifyContent:"space-between", alignItems:"center"}}>
+                        Rest (sec)
+                        <input type="number" value={rest} onChange={e => setRest(+e.target.value)}
+                          style={{width:"60px", padding:"4px 8px", border:`1px solid ${BH.g300}`, borderRadius:"4px"}} min="5" max="60"/>
+                      </label>
+                      <label style={{fontSize:"12px", color:BH.g700, display:"flex", justifyContent:"space-between", alignItems:"center"}}>
+                        Rounds
+                        <input type="number" value={rounds} onChange={e => setRounds(+e.target.value)}
+                          style={{width:"60px", padding:"4px 8px", border:`1px solid ${BH.g300}`, borderRadius:"4px"}} min="1" max="10"/>
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Selected exercises summary */}
+                  <div style={{background:BH.white, borderRadius:"8px", border:`2px solid ${BH.maroon}`,
+                               marginTop:"16px", overflow:"hidden"}}>
+                    <div style={{padding:"10px 14px", background:BH.maroon, color:BH.white,
+                                 fontSize:"13px", fontWeight:"bold"}}>
+                      Today's Circuit ({selExercises.length} exercises)
+                    </div>
+                    <div style={{padding:"8px 14px", maxHeight:"150px", overflowY:"auto"}}>
+                      {selExercises.length === 0 ? (
+                        <div style={{fontSize:"12px", color:BH.g500, padding:"8px 0"}}>
+                          Check exercises above to build circuit
+                        </div>
+                      ) : (
+                        selExercises.map((id, i) => {
+                          const e = EXERCISES.find(ex => ex.id === id);
+                          if (!e) return null;
+                          return (
+                            <div key={id} style={{display:"flex", gap:"8px", alignItems:"center", padding:"3px 0"}}>
+                              <span style={{fontSize:"11px", fontWeight:"bold", color:BH.maroon, minWidth:"18px"}}>{i+1}.</span>
+                              <span style={{fontSize:"12px", color:BH.navy}}>{e.name}</span>
+                              <button onClick={() => toggleExercise(id)} style={{marginLeft:"auto", background:"none",
+                                border:"none", cursor:"pointer", fontSize:"14px", color:BH.g400}}>×</button>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+
+                  {adminExercises.length > 0 && (
+                    <div style={{marginTop:"16px"}}>
+                      <CircuitTimer work={work} rest={rest} rounds={rounds} exercises={adminExercises}
+                        onStation={(i) => setCircuitStIdx(i)}/>
+                    </div>
+                  )}
+                </>
+              ) : (
+                /* Non-Admin: Published circuit (read-only) */
+                <>
+                  <div style={{background:BH.white, borderRadius:"8px", border:`2px solid ${BH.maroon}`, overflow:"hidden"}}>
+                    <div style={{padding:"12px 16px", background:BH.maroon, color:BH.white}}>
+                      <div style={{fontSize:"15px", fontWeight:"bold"}}>Today's Circuit</div>
+                      <div style={{fontSize:"11px", opacity:0.8}}>
+                        {playerExercises.length} exercises • {work}s work / {rest}s rest • {rounds} rounds
+                      </div>
+                    </div>
+                    <div style={{padding:"8px 0"}}>
+                      {playerExercises.length === 0 ? (
+                        <div style={{padding:"20px 16px", textAlign:"center", fontSize:"13px", color:BH.g500}}>
+                          No circuit published yet. Check back later!
+                        </div>
+                      ) : (
+                        playerExercises.map((e, i) => (
+                          <div key={e.id} style={{padding:"8px 16px", display:"flex", gap:"10px", alignItems:"center",
+                            borderBottom:`1px solid ${BH.g100}`,
+                            background:circuitStIdx===i ? `rgba(201,162,39,0.12)` : "transparent"}}>
+                            <span style={{fontSize:"14px", fontWeight:"bold", color:BH.maroon, minWidth:"24px"}}>{i+1}</span>
+                            <div>
+                              <div style={{fontSize:"13px", fontWeight:"bold", color:BH.navy}}>{e.name}</div>
+                              <div style={{fontSize:"11px", color:BH.g500}}>{e.reps} • {e.equip}</div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  {playerExercises.length > 0 && (
+                    <div style={{marginTop:"16px"}}>
+                      <CircuitTimer work={work} rest={rest} rounds={rounds} exercises={playerExercises}
+                        onStation={(i) => setCircuitStIdx(i)}/>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* Right: Circuit Ring + Timer */}
+            <div style={{flex:1, minWidth:0}}>
+              {circuitExercises.length === 0 ? (
+                <div style={{textAlign:"center", padding:"60px 20px", color:BH.g500}}>
+                  {admin ? "Select exercises from the left to build your circuit" : "No circuit published yet."}
+                </div>
+              ) : (
+                <>
+                  <CircuitRing stations={circuitExercises} selectedIdx={circuitStIdx}
+                    onSelect={(i) => setCircuitStIdx(i)}
+                    onRemove={admin ? (i) => {
+                      const id = circuitExercises[i] && circuitExercises[i].id;
+                      if (id) {
+                        setSelExercises(sel => sel.filter(x => x !== id));
+                        if (circuitStIdx === i) setCircuitStIdx(-1);
+                        else if (circuitStIdx > i) setCircuitStIdx(circuitStIdx - 1);
+                      }
+                    } : null}/>
+                  {/* Selected exercise detail card */}
+                  {circuitStIdx >= 0 && circuitStIdx < circuitExercises.length && (
+                    <div style={{background:BH.white, padding:"16px", borderRadius:"8px", border:`2px solid ${BH.maroon}`, marginTop:"16px", textAlign:"center"}}>
+                      <div style={{fontSize:"16px", fontWeight:"bold", color:BH.navy, marginBottom:"4px"}}>
+                        {circuitExercises[circuitStIdx].name}
+                      </div>
+                      <div style={{fontSize:"13px", color:BH.g700, marginBottom:"8px"}}>
+                        {circuitExercises[circuitStIdx].desc}
+                      </div>
+                      <div style={{display:"flex", justifyContent:"center", gap:"16px", fontSize:"12px", color:BH.g500}}>
+                        <span>{circuitExercises[circuitStIdx].reps}</span>
+                        <span>•</span>
+                        <span>{circuitExercises[circuitStIdx].equip}</span>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Mount the app
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App/>);
+
+  </script>
 </body>
 </html>
