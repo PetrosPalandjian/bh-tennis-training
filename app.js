@@ -150,6 +150,75 @@ function DrillViewer({drill}) {
   );
 }
 
+// DrillTimer Component
+function DrillTimer({duration, resetKey, onNext, canNext}) {
+  const [running, setRunning] = React.useState(false);
+  const [timeLeft, setTimeLeft] = React.useState(duration);
+  const tmr = React.useRef(null);
+
+  React.useEffect(() => {
+    setRunning(false);
+    setTimeLeft(duration);
+    if (tmr.current) clearInterval(tmr.current);
+    tmr.current = null;
+  }, [duration, resetKey]);
+
+  React.useEffect(() => {
+    if (!running) {
+      if (tmr.current) clearInterval(tmr.current);
+      tmr.current = null;
+      return;
+    }
+    tmr.current = setInterval(() => {
+      setTimeLeft(t => {
+        if (t <= 1) {
+          setRunning(false);
+          if (tmr.current) clearInterval(tmr.current);
+          tmr.current = null;
+          try { snd.done(); } catch(e) {}
+          return 0;
+        }
+        return t - 1;
+      });
+    }, 1000);
+    return () => { if (tmr.current) clearInterval(tmr.current); };
+  }, [running]);
+
+  const mm = String(Math.floor(timeLeft / 60)).padStart(2, "0");
+  const ss = String(timeLeft % 60).padStart(2, "0");
+
+  const btn = (bg) => ({
+    padding:"8px 12px",
+    background:bg,
+    color:BH.white,
+    border:"none",
+    borderRadius:"6px",
+    cursor:"pointer",
+    fontSize:"12px",
+    fontWeight:"bold"
+  });
+
+  return (
+    <div style={{background:BH.white, border:`1px solid ${BH.g300}`, borderRadius:"8px", padding:"12px 14px", marginBottom:"10px"}}>
+      <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"8px"}}>
+        <div style={{fontSize:"12px", fontWeight:"bold", color:BH.navy}}>Drill Timer</div>
+        <div style={{fontSize:"18px", fontWeight:"bold", color:BH.maroon}}>{mm}:{ss}</div>
+      </div>
+      <div style={{display:"flex", gap:"8px", flexWrap:"wrap"}}>
+        <button onClick={() => setRunning(r => !r)} style={btn(running ? BH.shotRed : BH.shotBlue)}>
+          {running ? "Pause" : "Start"}
+        </button>
+        <button onClick={() => setTimeLeft(duration)} style={btn(BH.g500)}>Reset</button>
+        <button onClick={() => setTimeLeft(t => t + 30)} style={btn(BH.navy)}>+30s</button>
+        <button onClick={onNext} disabled={!canNext} style={{
+          ...btn(canNext ? BH.maroon : BH.g300),
+          cursor: canNext ? "pointer" : "not-allowed"
+        }}>Next Drill</button>
+      </div>
+    </div>
+  );
+}
+
 // LoginModal Component
 function LoginModal({onLogin, onClose}) {
   const [un, setUn] = React.useState("");
@@ -214,6 +283,7 @@ function App() {
   const [tab, setTab] = React.useState("circuits");
   const [admin, setAdmin] = React.useState(false);
   const [showLogin, setShowLogin] = React.useState(false);
+  const [drillTime, setDrillTime] = React.useState(90);
 
   // Published plan state
   const [pubDrills, setPubDrills] = React.useState([]);
@@ -231,6 +301,7 @@ function App() {
   const [exCat, setExCat] = React.useState("All");
   const [viewDrill, setViewDrill] = React.useState(null);
   const [practiceMode, setPracticeMode] = React.useState(false);
+  const [showDrillTimer, setShowDrillTimer] = React.useState(true);
   const [pmIdx, setPmIdx] = React.useState(0);
   const [toast, setToast] = React.useState("");
   const [circuitStIdx, setCircuitStIdx] = React.useState(-1);
@@ -251,6 +322,7 @@ function App() {
       setWork(c.work || 45);
       setRest(c.rest || 15);
       setRounds(c.rounds || 3);
+      setDrillTime(c.drillTime || 90);
     };
     const loadFromSupabase = async () => {
       const res = await sbRest("published_plan?select=data&id=eq.1", { method: "GET" });
@@ -283,7 +355,7 @@ function App() {
 
   // Publish handler
   const handlePublish = () => {
-    const cfg = { drills: selDrills, exercises: selExercises, work, rest, rounds };
+    const cfg = { drills: selDrills, exercises: selExercises, work, rest, rounds, drillTime };
     const doLocalPublish = () => {
       localStorage.setItem("bh-tennis-published", JSON.stringify(cfg));
       setPubDrills(selDrills);
@@ -440,6 +512,22 @@ function App() {
                   Drill {pmIdx+1} of {pmDrills.length}: {pmDrill && pmDrill.name}
                 </div>
               </div>
+              {showDrillTimer && (
+                <DrillTimer
+                  duration={drillTime}
+                  resetKey={pmDrill && pmDrill.id}
+                  onNext={() => setPmIdx(Math.min(pmDrills.length-1, pmIdx+1))}
+                  canNext={pmIdx < pmDrills.length - 1}
+                />
+              )}
+              <div style={{display:"flex", justifyContent:"flex-end", marginBottom:"12px"}}>
+                <button onClick={() => setShowDrillTimer(v => !v)} style={{
+                  padding:"6px 10px", background:BH.g200, color:BH.navy, border:`1px solid ${BH.g300}`,
+                  borderRadius:"6px", cursor:"pointer", fontSize:"12px", fontWeight:"bold"
+                }}>
+                  {showDrillTimer ? "Hide Timer" : "Show Timer"}
+                </button>
+              </div>
               {pmDrill && <DrillViewer drill={pmDrill}/>}
               <div style={{display:"flex", gap:"8px", marginTop:"16px"}}>
                 <button onClick={() => setPmIdx(Math.max(0, pmIdx-1))} disabled={pmIdx<=0}
@@ -521,6 +609,19 @@ function App() {
                           })
                         )}
                       </div>
+                    </div>
+
+                    {/* Drill timer setting */}
+                    <div style={{background:BH.white, borderRadius:"8px", border:`1px solid ${BH.g300}`,
+                                 marginTop:"16px", padding:"14px"}}>
+                      <div style={{fontSize:"13px", fontWeight:"bold", color:BH.navy, marginBottom:"10px"}}>
+                        Drill Timer
+                      </div>
+                      <label style={{fontSize:"12px", color:BH.g700, display:"flex", justifyContent:"space-between", alignItems:"center"}}>
+                        Duration (sec)
+                        <input type="number" value={drillTime} onChange={e => setDrillTime(+e.target.value)}
+                          style={{width:"70px", padding:"4px 8px", border:`1px solid ${BH.g300}`, borderRadius:"4px"}} min="10" max="900"/>
+                      </label>
                     </div>
                   </>
                 ) : (
