@@ -457,6 +457,13 @@ function App() {
   // Circuit exercises to display
   const circuitExercises = admin ? adminExercises : playerExercises;
 
+  // Auto-select first circuit station when list changes
+  React.useEffect(() => {
+    if (circuitExercises.length > 0 && (circuitStIdx < 0 || circuitStIdx >= circuitExercises.length)) {
+      setCircuitStIdx(0);
+    }
+  }, [circuitExercises.length]);
+
   // Auto-select first drill when view drill is null
   React.useEffect(() => {
     if (!viewDrill) {
@@ -757,10 +764,11 @@ function App() {
                           const e = EXERCISES.find(ex => ex.id === id);
                           if (!e) return null;
                           return (
-                            <div key={id} style={{display:"flex", gap:"8px", alignItems:"center", padding:"3px 0"}}>
+                            <div key={id} onClick={() => setCircuitStIdx(i)}
+                                 style={{display:"flex", gap:"8px", alignItems:"center", padding:"3px 0", cursor:"pointer"}}>
                               <span style={{fontSize:"11px", fontWeight:"bold", color:BH.maroon, minWidth:"18px"}}>{i+1}.</span>
                               <span style={{fontSize:"12px", color:BH.navy}}>{e.name}</span>
-                              <button onClick={() => toggleExercise(id)} style={{marginLeft:"auto", background:"none",
+                              <button onClick={(ev) => { ev.stopPropagation(); toggleExercise(id); }} style={{marginLeft:"auto", background:"none",
                                 border:"none", cursor:"pointer", fontSize:"14px", color:BH.g400}}>×</button>
                             </div>
                           );
@@ -793,9 +801,10 @@ function App() {
                         </div>
                       ) : (
                         playerExercises.map((e, i) => (
-                          <div key={e.id} style={{padding:"8px 16px", display:"flex", gap:"10px", alignItems:"center",
-                            borderBottom:`1px solid ${BH.g100}`,
-                            background:circuitStIdx===i ? `rgba(201,162,39,0.12)` : "transparent"}}>
+                          <div key={e.id} onClick={() => setCircuitStIdx(i)}
+                            style={{padding:"8px 16px", display:"flex", gap:"10px", alignItems:"center",
+                              cursor:"pointer", borderBottom:`1px solid ${BH.g100}`,
+                              background:circuitStIdx===i ? `rgba(201,162,39,0.12)` : "transparent"}}>
                             <span style={{fontSize:"14px", fontWeight:"bold", color:BH.maroon, minWidth:"24px"}}>{i+1}</span>
                             <div>
                               <div style={{fontSize:"13px", fontWeight:"bold", color:BH.navy}}>{e.name}</div>
@@ -859,6 +868,11 @@ function App() {
                                 {circuitExercises[circuitStIdx].youtubeEnd ? ` to ${Math.floor(circuitExercises[circuitStIdx].youtubeEnd/60)}:${String(circuitExercises[circuitStIdx].youtubeEnd%60).padStart(2,"0")}` : ""}
                               </span>
                             )}
+                            <a href={`https://www.youtube.com/watch?v=${circuitExercises[circuitStIdx].youtubeId}`}
+                               target="_blank" rel="noopener noreferrer"
+                               style={{marginLeft:"auto", fontSize:"10px", color:BH.g200, textDecoration:"underline"}}>
+                              Open on YouTube
+                            </a>
                           </div>
                           <div style={{position:"relative", paddingBottom:"56.25%", height:0, overflow:"hidden"}}>
                             <iframe

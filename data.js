@@ -57,7 +57,7 @@ const EXERCISES=[
   {id:"pushups",name:"Push-Up Variations",cat:"Upper Body",desc:"Hands under shoulders, body straight, chest to floor, full lockout.",reps:"15 reps",equip:"None",youtubeId:"B_Qgxbabd6E"},
   {id:"band-pull",name:"Band Pull-Aparts",cat:"Upper Body",desc:"Pull the band apart, squeeze shoulder blades, and avoid shrugging.",reps:"15 reps",equip:"Resistance Band",youtubeId:"NqFnPPjib-Q"},
   {id:"oh-throw",name:"Overhead Throws",cat:"Upper Body",desc:"Load hips, drive up, and throw overhead with full-body power.",reps:"12 reps",equip:"Med Ball",youtubeId:"z1JiHB8a4PY"},
-  {id:"jump-rope",name:"Jump Rope",cat:"Cardio",desc:"Small, quick jumps with wrists turning the rope and elbows tucked.",reps:"Full dur",equip:"Jump Rope",youtubeId:"nMHfZ-yrFjA"},
+  {id:"jump-rope",name:"Jump Rope",cat:"Cardio",desc:"Small, quick jumps with wrists turning the rope and elbows tucked.",reps:"Full duration",equip:"Jump Rope",youtubeId:"nMHfZ-yrFjA"},
   {id:"mt-climbers",name:"Mountain Climbers",cat:"Cardio",desc:"Shoulders over wrists, core tight, and drive knees fast under control.",reps:"30 reps",equip:"None",youtubeId:"De3Gl-nC7IQ"},
   {id:"burpees",name:"Burpees",cat:"Cardio",desc:"Hands down, jump back, chest to floor, snap feet in, then jump up.",reps:"10 reps",equip:"None",youtubeId:"c1M1wjeZOYY"},
   {id:"high-knees",name:"High Knees",cat:"Cardio",desc:"Drive knees above hip height, pump the arms, and stay light on your feet.",reps:"30 sec",equip:"None",youtubeId:"lR3cpCVBjPM"}];
