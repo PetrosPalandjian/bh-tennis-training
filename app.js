@@ -806,21 +806,21 @@ function App() {
                         </div>
                       ) : (
                         playerExercises.map((e, i) => (
-                          <div key={e.id}
-                            role="button" tabIndex={0}
+                          <button key={e.id} type="button"
                             onClick={() => setCircuitStIdx(i)}
                             onMouseDown={() => setCircuitStIdx(i)}
                             onTouchStart={(ev) => { ev.preventDefault(); setCircuitStIdx(i); }}
                             onTouchEnd={(ev) => { ev.preventDefault(); setCircuitStIdx(i); }}
-                            style={{padding:"8px 16px", display:"flex", gap:"10px", alignItems:"center",
-                              cursor:"pointer", userSelect:"none", borderBottom:`1px solid ${BH.g100}`,
-                              background:circuitStIdx===i ? `rgba(201,162,39,0.12)` : "transparent"}}>
+                            style={{width:"100%", textAlign:"left", padding:"8px 16px", display:"flex", gap:"10px", alignItems:"center",
+                              cursor:"pointer", userSelect:"none", border:"none", background:"transparent",
+                              borderBottom:`1px solid ${BH.g100}`,
+                              outline:"none", backgroundColor: circuitStIdx===i ? `rgba(201,162,39,0.12)` : "transparent"}}>
                             <span style={{fontSize:"14px", fontWeight:"bold", color:BH.maroon, minWidth:"24px"}}>{i+1}</span>
                             <div>
                               <div style={{fontSize:"13px", fontWeight:"bold", color:BH.navy}}>{e.name}</div>
                               <div style={{fontSize:"11px", color:BH.g500}}>{e.reps} • {e.equip}</div>
                             </div>
-                          </div>
+                          </button>
                         ))
                       )}
                     </div>
