@@ -768,8 +768,9 @@ function App() {
                                  role="button" tabIndex={0}
                                  onClick={() => setCircuitStIdx(i)}
                                  onMouseDown={() => setCircuitStIdx(i)}
-                                 onTouchStart={() => setCircuitStIdx(i)}
-                                 style={{display:"flex", gap:"8px", alignItems:"center", padding:"3px 0", cursor:"pointer"}}>
+                                 onTouchStart={(ev) => { ev.preventDefault(); setCircuitStIdx(i); }}
+                                 onTouchEnd={(ev) => { ev.preventDefault(); setCircuitStIdx(i); }}
+                                 style={{display:"flex", gap:"8px", alignItems:"center", padding:"3px 0", cursor:"pointer", userSelect:"none"}}>
                               <span style={{fontSize:"11px", fontWeight:"bold", color:BH.maroon, minWidth:"18px"}}>{i+1}.</span>
                               <span style={{fontSize:"12px", color:BH.navy}}>{e.name}</span>
                               <button onClick={(ev) => { ev.stopPropagation(); toggleExercise(id); }} style={{marginLeft:"auto", background:"none",
@@ -809,9 +810,10 @@ function App() {
                             role="button" tabIndex={0}
                             onClick={() => setCircuitStIdx(i)}
                             onMouseDown={() => setCircuitStIdx(i)}
-                            onTouchStart={() => setCircuitStIdx(i)}
+                            onTouchStart={(ev) => { ev.preventDefault(); setCircuitStIdx(i); }}
+                            onTouchEnd={(ev) => { ev.preventDefault(); setCircuitStIdx(i); }}
                             style={{padding:"8px 16px", display:"flex", gap:"10px", alignItems:"center",
-                              cursor:"pointer", borderBottom:`1px solid ${BH.g100}`,
+                              cursor:"pointer", userSelect:"none", borderBottom:`1px solid ${BH.g100}`,
                               background:circuitStIdx===i ? `rgba(201,162,39,0.12)` : "transparent"}}>
                             <span style={{fontSize:"14px", fontWeight:"bold", color:BH.maroon, minWidth:"24px"}}>{i+1}</span>
                             <div>
