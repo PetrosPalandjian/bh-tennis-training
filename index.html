@@ -1547,7 +1547,10 @@ function DrillTimer({duration, resetKey, onNext, canNext, isAdmin, session, onAd
   const getStatus = () => session ? session.status : null;
   const getStart = () => session ? session.start_time : null;
   const getElapsedAtPause = () => session ? (session.elapsed_at_pause || 0) : 0;
-  const getDuration = () => session && typeof session.duration === "number" ? session.duration : duration;
+  const getDuration = () => {
+    const d = session && typeof session.duration === "number" ? session.duration : duration;
+    return Math.max(1, Number(d) || 0);
+  };
   const computeSharedTimeLeft = () => {
     const status = getStatus();
     const dur = getDuration();
@@ -1918,6 +1921,14 @@ function App() {
     if (typeof stretchSession.stat_duration === "number") setStatStretchTime(Math.max(5, stretchSession.stat_duration));
     if (typeof stretchSession.stat_rest === "number") setStatStretchRest(Math.max(0, stretchSession.stat_rest));
   }, [stretchSession]);
+
+  // Keep shared drill session in sync with admin selection/time
+  React.useEffect(() => {
+    if (!sb || !admin) return;
+    if (!viewDrill) return;
+    const dur = Math.max(1, Number(currentDrillTimeSafe) || 0);
+    updateDrillRow({ drill_id: viewDrill, duration: dur });
+  }, [sb, admin, viewDrill, currentDrillTimeSafe]);
 
   // Keep non-admin drill selection in sync with shared drill session
   React.useEffect(() => {
@@ -2414,12 +2425,13 @@ function App() {
   };
   const adminDrillStart = async () => {
     if (!sb) return;
+    const dur = Math.max(1, Number(currentDrillTimeSafe) || 0);
     const patch = {
       status: "running",
       start_time: new Date().toISOString(),
       elapsed_at_pause: 0,
       drill_id: viewDrill,
-      duration: currentDrillTimeSafe
+      duration: dur
     };
     await updateDrillRow(patch);
   };
@@ -2442,12 +2454,13 @@ function App() {
   };
   const adminDrillReset = async () => {
     if (!sb) return;
+    const dur = Math.max(1, Number(currentDrillTimeSafe) || 0);
     const patch = {
       status: "idle",
       start_time: null,
       elapsed_at_pause: 0,
       drill_id: viewDrill,
-      duration: currentDrillTimeSafe
+      duration: dur
     };
     await updateDrillRow(patch);
   };
@@ -2684,7 +2697,7 @@ function App() {
                   <DrillViewer drill={currentViewDrill}/>
                 ) : (
                   <div style={{textAlign:"center", padding:"60px 20px", color:BH.g500}}>
-                    {admin ? "Select a drill to preview" : "Select a drill from today's plan"}
+                    {admin ? "Select a drill to preview" : "Waiting for coach..."}
                   </div>
                 )}
               </div>
@@ -3093,7 +3106,7 @@ function App() {
             <div style={{flex:1, minWidth:0}}>
               {displayStretches.length === 0 ? (
                 <div style={{textAlign:"center", padding:"60px 20px", color:BH.g500}}>
-                  No stretches found for this filter.
+                  {admin ? "No stretches selected yet." : "Waiting for coach..."}
                 </div>
               ) : (
                 <>
