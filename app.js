@@ -497,6 +497,7 @@ function App() {
   };
 
   const circuitEquipment = summarizeEquipment(circuitExercises);
+  const circuitEquipTotal = circuitEquipment.reduce((sum, item) => sum + (item.count || 0), 0);
 
   // Auto-select first circuit station when list changes
   React.useEffect(() => {
@@ -823,30 +824,38 @@ function App() {
                     </div>
                   </div>
 
-                  {/* Equipment list */}
-                  <div style={{background:BH.white, borderRadius:"8px", border:`1px solid ${BH.g300}`,
-                               marginTop:"12px", padding:"12px 14px"}}>
-                    <div style={{fontSize:"12px", fontWeight:"bold", color:BH.navy, marginBottom:"6px"}}>
-                      Equipment Needed
-                    </div>
-                    {circuitEquipment.length === 0 ? (
-                      <div style={{fontSize:"12px", color:BH.g500}}>No equipment required.</div>
-                    ) : (
-                      <div style={{display:"flex", flexDirection:"column", gap:"4px"}}>
-                        {circuitEquipment.map(item => (
-                          <div key={item.name} style={{fontSize:"12px", color:BH.g700, display:"flex", justifyContent:"space-between"}}>
-                            <span>{item.name}{item.weights.size ? ` (${Array.from(item.weights).join(", ")})` : ""}</span>
-                            <span style={{color:BH.g500}}>x{item.count}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
 
                   {adminExercises.length > 0 && (
                     <div style={{marginTop:"16px"}}>
                       <CircuitTimer work={work} rest={rest} rounds={rounds} exercises={adminExercises}
                         onStation={(i) => setCircuitStIdx(i)}/>
+                    </div>
+                  )}
+
+                  {circuitExercises.length > 0 && (
+                    <div style={{background:BH.white, borderRadius:"8px", border:`2px solid ${BH.maroon}`,
+                                 marginTop:"16px", overflow:"hidden"}}>
+                      <div style={{padding:"10px 14px", background:BH.maroon, color:BH.white,
+                                   fontSize:"13px", fontWeight:"bold", display:"flex", justifyContent:"space-between", alignItems:"center"}}>
+                        <span>Equipment Needed</span>
+                        <span style={{fontSize:"11px", opacity:0.85}}>Total items: {circuitEquipTotal}</span>
+                      </div>
+                      <div style={{padding:"8px 14px"}}>
+                        {circuitEquipment.length === 0 ? (
+                          <div style={{fontSize:"12px", color:BH.g500, padding:"6px 0"}}>
+                            No equipment required.
+                          </div>
+                        ) : (
+                          <div style={{display:"flex", flexDirection:"column", gap:"6px"}}>
+                            {circuitEquipment.map(item => (
+                              <div key={item.name} style={{fontSize:"12px", color:BH.g700, display:"flex", justifyContent:"space-between"}}>
+                                <span>{item.name}{item.weights.size ? ` (${Array.from(item.weights).join(", ")})` : ""}</span>
+                                <span style={{color:BH.g500}}>x{item.count}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </>
@@ -890,30 +899,37 @@ function App() {
                     </div>
                   </div>
 
-                  {/* Equipment list */}
-                  <div style={{background:BH.white, borderRadius:"8px", border:`1px solid ${BH.g300}`,
-                               marginTop:"12px", padding:"12px 14px"}}>
-                    <div style={{fontSize:"12px", fontWeight:"bold", color:BH.navy, marginBottom:"6px"}}>
-                      Equipment Needed
-                    </div>
-                    {circuitEquipment.length === 0 ? (
-                      <div style={{fontSize:"12px", color:BH.g500}}>No equipment required.</div>
-                    ) : (
-                      <div style={{display:"flex", flexDirection:"column", gap:"4px"}}>
-                        {circuitEquipment.map(item => (
-                          <div key={item.name} style={{fontSize:"12px", color:BH.g700, display:"flex", justifyContent:"space-between"}}>
-                            <span>{item.name}{item.weights.size ? ` (${Array.from(item.weights).join(", ")})` : ""}</span>
-                            <span style={{color:BH.g500}}>x{item.count}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
                   {playerExercises.length > 0 && (
                     <div style={{marginTop:"16px"}}>
                       <CircuitTimer work={work} rest={rest} rounds={rounds} exercises={playerExercises}
                         onStation={(i) => setCircuitStIdx(i)}/>
+                    </div>
+                  )}
+
+                  {circuitExercises.length > 0 && (
+                    <div style={{background:BH.white, borderRadius:"8px", border:`2px solid ${BH.maroon}`,
+                                 marginTop:"16px", overflow:"hidden"}}>
+                      <div style={{padding:"10px 14px", background:BH.maroon, color:BH.white,
+                                   fontSize:"13px", fontWeight:"bold", display:"flex", justifyContent:"space-between", alignItems:"center"}}>
+                        <span>Equipment Needed</span>
+                        <span style={{fontSize:"11px", opacity:0.85}}>Total items: {circuitEquipTotal}</span>
+                      </div>
+                      <div style={{padding:"8px 14px"}}>
+                        {circuitEquipment.length === 0 ? (
+                          <div style={{fontSize:"12px", color:BH.g500, padding:"6px 0"}}>
+                            No equipment required.
+                          </div>
+                        ) : (
+                          <div style={{display:"flex", flexDirection:"column", gap:"6px"}}>
+                            {circuitEquipment.map(item => (
+                              <div key={item.name} style={{fontSize:"12px", color:BH.g700, display:"flex", justifyContent:"space-between"}}>
+                                <span>{item.name}{item.weights.size ? ` (${Array.from(item.weights).join(", ")})` : ""}</span>
+                                <span style={{color:BH.g500}}>x{item.count}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </>
