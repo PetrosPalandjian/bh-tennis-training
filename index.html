@@ -97,6 +97,43 @@ const EXERCISES=[
   {id:"high-knees",name:"High Knees",cat:"Cardio",desc:"Drive knees above hip height, pump the arms, and stay light on your feet.",reps:"30 sec",equip:"None",youtubeId:"lR3cpCVBjPM"}];
 const EX_CATS=["All",...Array.from(new Set(EXERCISES.map(e=>e.cat)))];
 
+const STRETCHES=[
+  {id:"leg-swings",name:"Leg Swings (Front/Back)",type:"Dynamic",area:"Hips/Hamstrings",desc:"Hold a fence or wall. Swing the leg forward and back under control, stay tall.",reps:"10 each"},
+  {id:"leg-swings-side",name:"Leg Swings (Side-to-Side)",type:"Dynamic",area:"Hips/Groin",desc:"Open the hip and swing across the body, then out to the side.",reps:"10 each"},
+  {id:"walking-lunge-twist",name:"Walking Lunge + Twist",type:"Dynamic",area:"Hip Flexors/Thoracic",desc:"Step into a lunge, rotate toward the front leg, then switch.",reps:"8 each"},
+  {id:"inch-worms",name:"Inchworms",type:"Dynamic",area:"Posterior Chain/Shoulders",desc:"Hinge forward, walk hands out to plank, then walk feet in.",reps:"6 reps"},
+  {id:"worlds-greatest",name:"World's Greatest Stretch",type:"Dynamic",area:"Hips/Thoracic",desc:"Lunge, elbow to instep, then rotate the chest to the sky.",reps:"5 each"},
+  {id:"arm-circles",name:"Arm Circles",type:"Dynamic",area:"Shoulders",desc:"Small to large circles forward and backward.",reps:"20 each way"},
+  {id:"high-knee-hugs",name:"High Knee Hugs",type:"Dynamic",area:"Glutes/Hips",desc:"Pull knee to chest, rise tall, then switch legs.",reps:"8 each"},
+  {id:"quad-pull-walk",name:"Walking Quad Pull",type:"Dynamic",area:"Quads/Hip Flexors",desc:"Grab ankle, pull heel to glute, squeeze glute, step forward.",reps:"8 each"},
+  {id:"a-skips",name:"A-Skips",type:"Dynamic",area:"Calves/Hip Flexors",desc:"Drive the knee up, dorsiflex the foot, and stay tall.",reps:"2 x 15 yards"},
+  {id:"karaoke",name:"Karaoke (Grapevine)",type:"Dynamic",area:"Hips/Groin",desc:"Cross behind and in front while staying low and controlled.",reps:"2 x 15 yards"},
+  {id:"lat-lunge-reach",name:"Lateral Lunge + Reach",type:"Dynamic",area:"Adductors/Thoracic",desc:"Sit into the hip, keep the other leg long, and reach over.",reps:"6 each"},
+  {id:"open-close-gate",name:"Open/Close the Gate",type:"Dynamic",area:"Hips",desc:"Lift the knee and rotate the hip open, then close across the body.",reps:"8 each"},
+  {id:"scorpion",name:"Scorpion Kicks",type:"Dynamic",area:"Hip Flexors/Thoracic",desc:"Prone, lift one leg and reach across to the opposite side.",reps:"6 each"},
+  {id:"shuffle-arm-swing",name:"Side Shuffle + Arm Swings",type:"Dynamic",area:"Hips/Shoulders",desc:"Short lateral shuffles while swinging the arms across the body.",reps:"2 x 10 yards"},
+  {id:"rev-lunge-knee",name:"Reverse Lunge to Knee Drive",type:"Dynamic",area:"Glutes/Balance",desc:"Step back into a lunge, then drive the knee up and hold tall.",reps:"6 each"},
+  {id:"ankle-hops",name:"Ankle Hops",type:"Dynamic",area:"Ankles/Achilles",desc:"Small quick hops, stay on the balls of your feet.",reps:"20 reps"},
+  {id:"hamstring",name:"Seated Hamstring Stretch",type:"Static",area:"Hamstrings",desc:"Sit tall, hinge at the hips, and reach to the shin or toe.",reps:"30 sec"},
+  {id:"quad",name:"Standing Quad Stretch",type:"Static",area:"Quads",desc:"Knees together, pelvis tucked, hold the ankle gently.",reps:"30 sec each"},
+  {id:"calf",name:"Wall Calf Stretch",type:"Static",area:"Calves",desc:"Back heel down, knee straight, lean into the wall.",reps:"30 sec each"},
+  {id:"hip-flexor",name:"Half-Kneeling Hip Flexor",type:"Static",area:"Hip Flexors",desc:"Tuck pelvis, squeeze glute, shift forward slightly.",reps:"30 sec each"},
+  {id:"figure-4",name:"Figure-4 Glute Stretch",type:"Static",area:"Glutes",desc:"Cross ankle over knee, pull the legs in until you feel the stretch.",reps:"30 sec each"},
+  {id:"adductor",name:"Butterfly Groin Stretch",type:"Static",area:"Groin",desc:"Feet together, knees out, hinge forward with a long spine.",reps:"30 sec"},
+  {id:"childs-pose",name:"Child's Pose",type:"Static",area:"Back/Lats",desc:"Sit hips back, reach long through the arms, breathe deep.",reps:"45 sec"},
+  {id:"cross-body",name:"Cross-Body Shoulder Stretch",type:"Static",area:"Shoulders",desc:"Pull arm across the chest, keep shoulders down.",reps:"30 sec each"},
+  {id:"triceps",name:"Overhead Triceps Stretch",type:"Static",area:"Triceps/Shoulders",desc:"Elbow up, gentle pull with the other hand.",reps:"30 sec each"},
+  {id:"pigeon",name:"Pigeon Stretch",type:"Static",area:"Glutes/Piriformis",desc:"Front leg bent, back leg long, hinge forward as tolerated.",reps:"30 sec each"},
+  {id:"couch-stretch",name:"Couch Stretch",type:"Static",area:"Hip Flexors/Quads",desc:"Back shin on wall/bench, keep ribs down, squeeze glute.",reps:"30 sec each"},
+  {id:"soleus",name:"Bent-Knee Calf Stretch",type:"Static",area:"Soleus",desc:"Back heel down, knee bent, lean forward slightly.",reps:"30 sec each"},
+  {id:"hamstring-strap",name:"Supine Hamstring with Strap",type:"Static",area:"Hamstrings",desc:"Lie on back, loop strap, and gently straighten the knee.",reps:"30 sec each"},
+  {id:"sleeper",name:"Sleeper Stretch",type:"Static",area:"Posterior Shoulder",desc:"Side-lying, gently rotate the forearm down.",reps:"30 sec each"},
+  {id:"pec-doorway",name:"Doorway Pec Stretch",type:"Static",area:"Chest/Shoulders",desc:"Forearm on the doorframe, step through until gentle stretch.",reps:"30 sec each"},
+  {id:"forearm",name:"Forearm Flexor/Extensor Stretch",type:"Static",area:"Forearms",desc:"Straight arm, palm down then up, gently pull fingers.",reps:"30 sec each"},
+  {id:"spinal-twist",name:"Supine Spinal Twist",type:"Static",area:"Low Back/Hips",desc:"Knees to one side, shoulders heavy, breathe deep.",reps:"30 sec each"}
+];
+const STRETCH_TYPES=["All",...Array.from(new Set(STRETCHES.map(s=>s.type)))];
+
 const DRILLS=[
   {
     id:"cc-fh",name:"Crosscourt Forehand",cat:"Groundstrokes",diff:"Beginner",skill:"Forehand",
@@ -1564,6 +1601,122 @@ function DrillTimer({duration, resetKey, onNext, canNext}) {
   );
 }
 
+// StretchTimer Component
+function StretchTimer({label, duration, color, session, kind, isAdmin, onAdminStart, onAdminPause, onAdminResume, onAdminReset}) {
+  const [running, setRunning] = React.useState(false);
+  const [timeLeft, setTimeLeft] = React.useState(duration);
+  const tmr = React.useRef(null);
+
+  const getStatus = () => session ? session[`${kind}_status`] : null;
+  const getStart = () => session ? session[`${kind}_start_time`] : null;
+  const getElapsedAtPause = () => session ? (session[`${kind}_elapsed_at_pause`] || 0) : 0;
+  const computeSharedTimeLeft = () => {
+    const status = getStatus();
+    if (!status) return duration;
+    if (status === "idle") return duration;
+    if (status === "paused") return Math.max(0, duration - getElapsedAtPause());
+    const start = getStart();
+    if (!start) return duration;
+    const elapsed = Math.max(0, Math.floor((Date.now() - Date.parse(start)) / 1000));
+    return Math.max(0, duration - elapsed);
+  };
+
+  React.useEffect(() => {
+    setRunning(false);
+    setTimeLeft(duration);
+    if (tmr.current) clearInterval(tmr.current);
+    tmr.current = null;
+  }, [duration]);
+
+  React.useEffect(() => {
+    if (session) {
+      setTimeLeft(computeSharedTimeLeft());
+      tmr.current = setInterval(() => {
+        setTimeLeft(computeSharedTimeLeft());
+      }, 1000);
+      return () => { if (tmr.current) clearInterval(tmr.current); };
+    }
+    if (!running) {
+      if (tmr.current) clearInterval(tmr.current);
+      tmr.current = null;
+      return;
+    }
+    tmr.current = setInterval(() => {
+      setTimeLeft(t => {
+        if (t <= 1) {
+          setRunning(false);
+          if (tmr.current) clearInterval(tmr.current);
+          tmr.current = null;
+          try { snd.done(); } catch(e) {}
+          return 0;
+        }
+        return t - 1;
+      });
+    }, 1000);
+    return () => { if (tmr.current) clearInterval(tmr.current); };
+  }, [running]);
+
+  const mm = String(Math.floor(timeLeft / 60)).padStart(2, "0");
+  const ss = String(timeLeft % 60).padStart(2, "0");
+  const btn = (bg) => ({
+    padding:"8px 12px",
+    background:bg,
+    color:BH.white,
+    border:"none",
+    borderRadius:"6px",
+    cursor:"pointer",
+    fontSize:"12px",
+    fontWeight:"bold"
+  });
+
+  const status = session ? getStatus() : null;
+  const canAdmin = isAdmin && !!session;
+  const startLabel = status === "running" ? "Pause" : status === "paused" ? "Resume" : "Start";
+
+  return (
+    <div style={{background:BH.white, border:`1px solid ${BH.g300}`, borderRadius:"8px", padding:"12px 14px"}}>
+      <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"8px", gap:"8px"}}>
+        <div style={{fontSize:"12px", fontWeight:"bold", color:BH.navy}}>{label}</div>
+        <div style={{fontSize:"18px", fontWeight:"bold", color:color}}>{mm}:{ss}</div>
+      </div>
+      <div style={{display:"flex", gap:"8px", flexWrap:"wrap"}}>
+        {session ? (
+          <>
+            <button
+              onClick={() => {
+                if (!canAdmin) return;
+                if (status === "running") onAdminPause();
+                else if (status === "paused") onAdminResume();
+                else onAdminStart();
+              }}
+              disabled={!canAdmin}
+              style={{
+                ...btn(status === "running" ? BH.shotRed : BH.shotBlue),
+                cursor: canAdmin ? "pointer" : "not-allowed",
+                opacity: canAdmin ? 1 : 0.6
+              }}>
+              {startLabel}
+            </button>
+            <button onClick={() => { if (canAdmin) onAdminReset(); }} disabled={!canAdmin} style={{
+              ...btn(BH.g500),
+              cursor: canAdmin ? "pointer" : "not-allowed",
+              opacity: canAdmin ? 1 : 0.6
+            }}>Reset</button>
+          </>
+        ) : (
+          <>
+            <button onClick={() => setRunning(r => !r)} style={btn(running ? BH.shotRed : BH.shotBlue)}>
+              {running ? "Pause" : "Start"}
+            </button>
+            <button onClick={() => setTimeLeft(duration)} style={btn(BH.g500)}>Reset</button>
+            <button onClick={() => setTimeLeft(t => t + 30)} style={btn(BH.navy)}>+30s</button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // LoginModal Component (Supabase email/password)
 function LoginModal({onLogin, onClose}) {
   const [email, setEmail] = React.useState("");
@@ -1636,6 +1789,8 @@ function App() {
   const [isSmall, setIsSmall] = React.useState(window.innerWidth < 768);
   const [session, setSession] = React.useState(null);
   const [sessionReady, setSessionReady] = React.useState(false);
+  const [stretchSession, setStretchSession] = React.useState(null);
+  const [stretchReady, setStretchReady] = React.useState(false);
 
   // Published plan state
   const [pubDrills, setPubDrills] = React.useState([]);
@@ -1651,9 +1806,19 @@ function App() {
   // UI state
   const [drSkill, setDrSkill] = React.useState("All");
   const [exCat, setExCat] = React.useState("All");
+  const [stretchType, setStretchType] = React.useState("All");
+  const [dynStretchTime, setDynStretchTime] = React.useState(360);
+  const [statStretchTime, setStatStretchTime] = React.useState(480);
   const [viewDrill, setViewDrill] = React.useState(null);
   const [toast, setToast] = React.useState("");
   const [circuitStIdx, setCircuitStIdx] = React.useState(-1);
+
+  // Sync stretch durations from session
+  React.useEffect(() => {
+    if (!stretchSession) return;
+    if (typeof stretchSession.dyn_duration === "number") setDynStretchTime(stretchSession.dyn_duration);
+    if (typeof stretchSession.stat_duration === "number") setStatStretchTime(stretchSession.stat_duration);
+  }, [stretchSession]);
 
   // Load config on mount
   React.useEffect(() => {
@@ -1748,6 +1913,26 @@ function App() {
     };
   }, [sb]);
 
+  // Load stretch session + subscribe to realtime
+  React.useEffect(() => {
+    let channel = null;
+    if (!sb) return;
+    const loadStretchSession = async () => {
+      const { data, error } = await sb.from("stretch_session").select("*").eq("id", 1).single();
+      if (!error) setStretchSession(data);
+      setStretchReady(true);
+    };
+    loadStretchSession();
+    channel = sb.channel("stretch_session")
+      .on("postgres_changes", { event: "*", schema: "public", table: "stretch_session", filter: "id=eq.1" }, (payload) => {
+        if (payload.new) setStretchSession(payload.new);
+      })
+      .subscribe();
+    return () => {
+      if (channel) sb.removeChannel(channel);
+    };
+  }, [sb]);
+
   // Track viewport for responsive layout
   React.useEffect(() => {
     const onResize = () => {
@@ -1822,6 +2007,7 @@ function App() {
     (drSkill === "All" || d.skill === drSkill)
   );
   const filteredExercises = exCat === "All" ? EXERCISES : EXERCISES.filter(e => e.cat === exCat);
+  const filteredStretches = stretchType === "All" ? STRETCHES : STRETCHES.filter(s => s.type === stretchType);
 
   // The drill list that non-admin players see (only published drills, in order)
   const playerDrills = pubDrills.map(d => {
@@ -1938,6 +2124,58 @@ function App() {
     }).eq("id", 1);
   };
 
+  // Stretch session helpers (admin)
+  const calcStretchElapsed = (kind) => {
+    if (!stretchSession) return 0;
+    const status = stretchSession[`${kind}_status`];
+    if (status !== "running") return stretchSession[`${kind}_elapsed_at_pause`] || 0;
+    const start = stretchSession[`${kind}_start_time`];
+    if (!start) return 0;
+    return Math.max(0, Math.floor((Date.now() - Date.parse(start)) / 1000));
+  };
+  const updateStretchDurations = async (nextDyn, nextStat) => {
+    if (!sb) return;
+    await sb.from("stretch_session").update({
+      dyn_duration: nextDyn,
+      stat_duration: nextStat
+    }).eq("id", 1);
+  };
+  const adminStretchStart = async (kind) => {
+    if (!sb) return;
+    const duration = kind === "dyn" ? dynStretchTime : statStretchTime;
+    const patch = {};
+    patch[`${kind}_status`] = "running";
+    patch[`${kind}_start_time`] = new Date().toISOString();
+    patch[`${kind}_elapsed_at_pause`] = 0;
+    patch[`${kind}_duration`] = duration;
+    await sb.from("stretch_session").update(patch).eq("id", 1);
+  };
+  const adminStretchPause = async (kind) => {
+    if (!sb) return;
+    const patch = {};
+    patch[`${kind}_status`] = "paused";
+    patch[`${kind}_elapsed_at_pause`] = calcStretchElapsed(kind);
+    await sb.from("stretch_session").update(patch).eq("id", 1);
+  };
+  const adminStretchResume = async (kind) => {
+    if (!sb) return;
+    const elapsed = calcStretchElapsed(kind);
+    const patch = {};
+    patch[`${kind}_status`] = "running";
+    patch[`${kind}_start_time`] = new Date(Date.now() - elapsed * 1000).toISOString();
+    await sb.from("stretch_session").update(patch).eq("id", 1);
+  };
+  const adminStretchReset = async (kind) => {
+    if (!sb) return;
+    const duration = kind === "dyn" ? dynStretchTime : statStretchTime;
+    const patch = {};
+    patch[`${kind}_status`] = "idle";
+    patch[`${kind}_start_time`] = null;
+    patch[`${kind}_elapsed_at_pause`] = 0;
+    patch[`${kind}_duration`] = duration;
+    await sb.from("stretch_session").update(patch).eq("id", 1);
+  };
+
   // Auto-select first circuit station when list changes
   React.useEffect(() => {
     if (circuitExercises.length > 0 && (circuitStIdx < 0 || circuitStIdx >= circuitExercises.length)) {
@@ -2008,6 +2246,9 @@ function App() {
         </button>
         <button onClick={() => { setTab("drills"); }} style={tabBtn(tab==="drills")}>
           Drills
+        </button>
+        <button onClick={() => { setTab("stretches"); }} style={tabBtn(tab==="stretches")}>
+          Stretches
         </button>
       </div>
 
@@ -2445,6 +2686,143 @@ function App() {
                     )}
                   </div>
                 )}
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ===== STRETCHES TAB ===== */}
+        {tab === "stretches" && (
+          <div style={{display:"flex", gap:"20px", flexDirection:isMobile ? "column" : "row"}}>
+            <div style={{width:isMobile ? "100%" : "260px", flexShrink:0}}>
+              <div style={{display:"flex", flexWrap:"wrap", gap:"6px", marginBottom:"16px"}}>
+                {STRETCH_TYPES.map(t => (
+                  <button key={t} onClick={() => setStretchType(t)} style={catBtn(stretchType===t)}>{t}</button>
+                ))}
+              </div>
+              <div style={{background:BH.white, borderRadius:"8px", border:`1px solid ${BH.g300}`, padding:"12px 14px"}}>
+                <div style={{fontSize:"12px", fontWeight:"bold", color:BH.navy, marginBottom:"6px"}}>Stretching Notes</div>
+                <div style={{fontSize:"12px", color:BH.g700, lineHeight:1.4}}>
+                  Dynamic before hitting. Static after practice. Breathe and never force the range.
+                </div>
+              </div>
+              {admin ? (
+                <div style={{background:BH.white, borderRadius:"8px", border:`1px solid ${BH.g300}`, padding:"12px 14px", marginTop:"12px"}}>
+                  <div style={{fontSize:"12px", fontWeight:"bold", color:BH.navy, marginBottom:"8px"}}>Timer Defaults</div>
+                  <div style={{display:"flex", flexDirection:"column", gap:"8px"}}>
+                    <label style={{fontSize:"12px", color:BH.g700, display:"flex", justifyContent:"space-between", alignItems:"center"}}>
+                      Dynamic (sec)
+                      <input type="number" value={dynStretchTime} onChange={e => {
+                        const v = Math.max(30, +e.target.value || 0);
+                        setDynStretchTime(v);
+                        if (sb) updateStretchDurations(v, statStretchTime);
+                      }}
+                        style={{width:"70px", padding:"4px 8px", border:`1px solid ${BH.g300}`, borderRadius:"4px"}} min="30" max="1800"/>
+                    </label>
+                    <label style={{fontSize:"12px", color:BH.g700, display:"flex", justifyContent:"space-between", alignItems:"center"}}>
+                      Static (sec)
+                      <input type="number" value={statStretchTime} onChange={e => {
+                        const v = Math.max(30, +e.target.value || 0);
+                        setStatStretchTime(v);
+                        if (sb) updateStretchDurations(dynStretchTime, v);
+                      }}
+                        style={{width:"70px", padding:"4px 8px", border:`1px solid ${BH.g300}`, borderRadius:"4px"}} min="30" max="1800"/>
+                    </label>
+                  </div>
+                </div>
+              ) : (
+                <div style={{background:BH.white, borderRadius:"8px", border:`1px solid ${BH.g300}`, padding:"12px 14px", marginTop:"12px"}}>
+                  <div style={{fontSize:"12px", fontWeight:"bold", color:BH.navy, marginBottom:"6px"}}>Timer Defaults</div>
+                  <div style={{fontSize:"12px", color:BH.g700}}>Dynamic: {dynStretchTime}s • Static: {statStretchTime}s</div>
+                </div>
+              )}
+            </div>
+            <div style={{flex:1, minWidth:0}}>
+              {filteredStretches.length === 0 ? (
+                <div style={{textAlign:"center", padding:"60px 20px", color:BH.g500}}>
+                  No stretches found for this filter.
+                </div>
+              ) : (
+                <>
+                  <div style={{display:"flex", gap:"10px", flexWrap:"wrap", marginBottom:"10px"}}>
+                    <div style={{flex:1, minWidth:"220px"}}>
+                      <StretchTimer
+                        label="Dynamic Timer"
+                        duration={dynStretchTime}
+                        color={BH.shotBlue}
+                        session={stretchReady ? stretchSession : null}
+                        kind="dyn"
+                        isAdmin={admin}
+                        onAdminStart={() => adminStretchStart("dyn")}
+                        onAdminPause={() => adminStretchPause("dyn")}
+                        onAdminResume={() => adminStretchResume("dyn")}
+                        onAdminReset={() => adminStretchReset("dyn")}
+                      />
+                    </div>
+                    <div style={{flex:1, minWidth:"220px"}}>
+                      <StretchTimer
+                        label="Static Timer"
+                        duration={statStretchTime}
+                        color={BH.maroon}
+                        session={stretchReady ? stretchSession : null}
+                        kind="stat"
+                        isAdmin={admin}
+                        onAdminStart={() => adminStretchStart("stat")}
+                        onAdminPause={() => adminStretchPause("stat")}
+                        onAdminResume={() => adminStretchResume("stat")}
+                        onAdminReset={() => adminStretchReset("stat")}
+                      />
+                    </div>
+                  </div>
+                  <div style={{fontSize:"13px", fontWeight:"bold", color:BH.navy, margin:"4px 0 10px"}}>Pre-Practice</div>
+                  <div style={{display:"grid", gridTemplateColumns:isSmall ? "1fr" : "1fr 1fr", gap:"12px"}}>
+                    {filteredStretches.filter(s => s.type === "Dynamic").map(s => {
+                      const badgeColor = BH.shotBlue;
+                      return (
+                        <div key={s.id} style={{background:BH.white, borderRadius:"10px", border:`1px solid ${BH.g300}`,
+                          padding:"14px", display:"flex", flexDirection:"column", gap:"8px"}}>
+                          <div style={{display:"flex", justifyContent:"space-between", gap:"10px", alignItems:"center"}}>
+                            <div style={{fontSize:"14px", fontWeight:"bold", color:BH.navy}}>{s.name}</div>
+                            <span style={{fontSize:"10px", color:BH.white, background:badgeColor, padding:"3px 8px",
+                              borderRadius:"999px", fontWeight:"bold", letterSpacing:"0.3px"}}>
+                              Dynamic
+                            </span>
+                          </div>
+                          <div style={{fontSize:"12px", color:BH.g700, lineHeight:1.35}}>{s.desc}</div>
+                          <div style={{display:"flex", gap:"8px", flexWrap:"wrap", fontSize:"11px", color:BH.g500}}>
+                            <span>{s.area}</span>
+                            <span>•</span>
+                            <span>{s.reps}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div style={{fontSize:"13px", fontWeight:"bold", color:BH.navy, margin:"18px 0 10px"}}>After Practice</div>
+                  <div style={{display:"grid", gridTemplateColumns:isSmall ? "1fr" : "1fr 1fr", gap:"12px"}}>
+                    {filteredStretches.filter(s => s.type === "Static").map(s => {
+                      const badgeColor = BH.maroon;
+                      return (
+                        <div key={s.id} style={{background:BH.white, borderRadius:"10px", border:`1px solid ${BH.g300}`,
+                          padding:"14px", display:"flex", flexDirection:"column", gap:"8px"}}>
+                          <div style={{display:"flex", justifyContent:"space-between", gap:"10px", alignItems:"center"}}>
+                            <div style={{fontSize:"14px", fontWeight:"bold", color:BH.navy}}>{s.name}</div>
+                            <span style={{fontSize:"10px", color:BH.white, background:badgeColor, padding:"3px 8px",
+                              borderRadius:"999px", fontWeight:"bold", letterSpacing:"0.3px"}}>
+                              Static
+                            </span>
+                          </div>
+                          <div style={{fontSize:"12px", color:BH.g700, lineHeight:1.35}}>{s.desc}</div>
+                          <div style={{display:"flex", gap:"8px", flexWrap:"wrap", fontSize:"11px", color:BH.g500}}>
+                            <span>{s.area}</span>
+                            <span>•</span>
+                            <span>{s.reps}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </>
               )}
             </div>

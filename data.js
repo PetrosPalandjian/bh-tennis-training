@@ -73,6 +73,43 @@ const EXERCISES=[
   {id:"high-knees",name:"High Knees",cat:"Cardio",desc:"Drive knees above hip height, pump the arms, and stay light on your feet.",reps:"30 sec",equip:"None",youtubeId:"lR3cpCVBjPM"}];
 const EX_CATS=["All",...Array.from(new Set(EXERCISES.map(e=>e.cat)))];
 
+const STRETCHES=[
+  {id:"leg-swings",name:"Leg Swings (Front/Back)",type:"Dynamic",area:"Hips/Hamstrings",desc:"Hold a fence or wall. Swing the leg forward and back under control, stay tall.",reps:"10 each"},
+  {id:"leg-swings-side",name:"Leg Swings (Side-to-Side)",type:"Dynamic",area:"Hips/Groin",desc:"Open the hip and swing across the body, then out to the side.",reps:"10 each"},
+  {id:"walking-lunge-twist",name:"Walking Lunge + Twist",type:"Dynamic",area:"Hip Flexors/Thoracic",desc:"Step into a lunge, rotate toward the front leg, then switch.",reps:"8 each"},
+  {id:"inch-worms",name:"Inchworms",type:"Dynamic",area:"Posterior Chain/Shoulders",desc:"Hinge forward, walk hands out to plank, then walk feet in.",reps:"6 reps"},
+  {id:"worlds-greatest",name:"World's Greatest Stretch",type:"Dynamic",area:"Hips/Thoracic",desc:"Lunge, elbow to instep, then rotate the chest to the sky.",reps:"5 each"},
+  {id:"arm-circles",name:"Arm Circles",type:"Dynamic",area:"Shoulders",desc:"Small to large circles forward and backward.",reps:"20 each way"},
+  {id:"high-knee-hugs",name:"High Knee Hugs",type:"Dynamic",area:"Glutes/Hips",desc:"Pull knee to chest, rise tall, then switch legs.",reps:"8 each"},
+  {id:"quad-pull-walk",name:"Walking Quad Pull",type:"Dynamic",area:"Quads/Hip Flexors",desc:"Grab ankle, pull heel to glute, squeeze glute, step forward.",reps:"8 each"},
+  {id:"a-skips",name:"A-Skips",type:"Dynamic",area:"Calves/Hip Flexors",desc:"Drive the knee up, dorsiflex the foot, and stay tall.",reps:"2 x 15 yards"},
+  {id:"karaoke",name:"Karaoke (Grapevine)",type:"Dynamic",area:"Hips/Groin",desc:"Cross behind and in front while staying low and controlled.",reps:"2 x 15 yards"},
+  {id:"lat-lunge-reach",name:"Lateral Lunge + Reach",type:"Dynamic",area:"Adductors/Thoracic",desc:"Sit into the hip, keep the other leg long, and reach over.",reps:"6 each"},
+  {id:"open-close-gate",name:"Open/Close the Gate",type:"Dynamic",area:"Hips",desc:"Lift the knee and rotate the hip open, then close across the body.",reps:"8 each"},
+  {id:"scorpion",name:"Scorpion Kicks",type:"Dynamic",area:"Hip Flexors/Thoracic",desc:"Prone, lift one leg and reach across to the opposite side.",reps:"6 each"},
+  {id:"shuffle-arm-swing",name:"Side Shuffle + Arm Swings",type:"Dynamic",area:"Hips/Shoulders",desc:"Short lateral shuffles while swinging the arms across the body.",reps:"2 x 10 yards"},
+  {id:"rev-lunge-knee",name:"Reverse Lunge to Knee Drive",type:"Dynamic",area:"Glutes/Balance",desc:"Step back into a lunge, then drive the knee up and hold tall.",reps:"6 each"},
+  {id:"ankle-hops",name:"Ankle Hops",type:"Dynamic",area:"Ankles/Achilles",desc:"Small quick hops, stay on the balls of your feet.",reps:"20 reps"},
+  {id:"hamstring",name:"Seated Hamstring Stretch",type:"Static",area:"Hamstrings",desc:"Sit tall, hinge at the hips, and reach to the shin or toe.",reps:"30 sec"},
+  {id:"quad",name:"Standing Quad Stretch",type:"Static",area:"Quads",desc:"Knees together, pelvis tucked, hold the ankle gently.",reps:"30 sec each"},
+  {id:"calf",name:"Wall Calf Stretch",type:"Static",area:"Calves",desc:"Back heel down, knee straight, lean into the wall.",reps:"30 sec each"},
+  {id:"hip-flexor",name:"Half-Kneeling Hip Flexor",type:"Static",area:"Hip Flexors",desc:"Tuck pelvis, squeeze glute, shift forward slightly.",reps:"30 sec each"},
+  {id:"figure-4",name:"Figure-4 Glute Stretch",type:"Static",area:"Glutes",desc:"Cross ankle over knee, pull the legs in until you feel the stretch.",reps:"30 sec each"},
+  {id:"adductor",name:"Butterfly Groin Stretch",type:"Static",area:"Groin",desc:"Feet together, knees out, hinge forward with a long spine.",reps:"30 sec"},
+  {id:"childs-pose",name:"Child's Pose",type:"Static",area:"Back/Lats",desc:"Sit hips back, reach long through the arms, breathe deep.",reps:"45 sec"},
+  {id:"cross-body",name:"Cross-Body Shoulder Stretch",type:"Static",area:"Shoulders",desc:"Pull arm across the chest, keep shoulders down.",reps:"30 sec each"},
+  {id:"triceps",name:"Overhead Triceps Stretch",type:"Static",area:"Triceps/Shoulders",desc:"Elbow up, gentle pull with the other hand.",reps:"30 sec each"},
+  {id:"pigeon",name:"Pigeon Stretch",type:"Static",area:"Glutes/Piriformis",desc:"Front leg bent, back leg long, hinge forward as tolerated.",reps:"30 sec each"},
+  {id:"couch-stretch",name:"Couch Stretch",type:"Static",area:"Hip Flexors/Quads",desc:"Back shin on wall/bench, keep ribs down, squeeze glute.",reps:"30 sec each"},
+  {id:"soleus",name:"Bent-Knee Calf Stretch",type:"Static",area:"Soleus",desc:"Back heel down, knee bent, lean forward slightly.",reps:"30 sec each"},
+  {id:"hamstring-strap",name:"Supine Hamstring with Strap",type:"Static",area:"Hamstrings",desc:"Lie on back, loop strap, and gently straighten the knee.",reps:"30 sec each"},
+  {id:"sleeper",name:"Sleeper Stretch",type:"Static",area:"Posterior Shoulder",desc:"Side-lying, gently rotate the forearm down.",reps:"30 sec each"},
+  {id:"pec-doorway",name:"Doorway Pec Stretch",type:"Static",area:"Chest/Shoulders",desc:"Forearm on the doorframe, step through until gentle stretch.",reps:"30 sec each"},
+  {id:"forearm",name:"Forearm Flexor/Extensor Stretch",type:"Static",area:"Forearms",desc:"Straight arm, palm down then up, gently pull fingers.",reps:"30 sec each"},
+  {id:"spinal-twist",name:"Supine Spinal Twist",type:"Static",area:"Low Back/Hips",desc:"Knees to one side, shoulders heavy, breathe deep.",reps:"30 sec each"}
+];
+const STRETCH_TYPES=["All",...Array.from(new Set(STRETCHES.map(s=>s.type)))];
+
 const DRILLS=[
   {
     id:"cc-fh",name:"Crosscourt Forehand",cat:"Groundstrokes",diff:"Beginner",skill:"Forehand",
