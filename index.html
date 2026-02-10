@@ -1779,47 +1779,6 @@ function App() {
 
   const circuitEquipment = summarizeEquipment(circuitExercises);
 
-  // Equipment summary for circuit exercises
-  const summarizeEquipment = (items) => {
-    const map = new Map();
-    const normalizeName = (raw) => {
-      const s = raw.trim().toLowerCase();
-      if (!s || s === "none") return null;
-      if (s.includes("wall")) return null;
-      if (s.includes("med ball") || s.includes("medicine ball")) return "Medicine Balls";
-      if (s.includes("agility ladder") || s.includes("ladder")) return "Ladders";
-      if (s.includes("cone")) return "Cones";
-      if (s.includes("resistance band") || s.includes("band")) return "Bands";
-      if (s.includes("dumbbell")) return "Dumbbells";
-      if (s.includes("jump rope")) return "Jump Ropes";
-      if (s.includes("bench") || s.includes("box")) return "Boxes/Benches";
-      if (s.includes("step")) return "Steps";
-      return raw.trim().replace(/\s+/g, " ").replace(/\b\w/g, c => c.toUpperCase());
-    };
-    const addItem = (name, count, weight) => {
-      if (!name) return;
-      const cur = map.get(name) || { name, count: 0, weights: new Set() };
-      cur.count += count || 1;
-      if (weight) cur.weights.add(weight);
-      map.set(name, cur);
-    };
-    items.forEach(e => {
-      if (!e || !e.equip) return;
-      const parts = e.equip.split(/,|\/|\s\+\s/).map(p => p.trim()).filter(Boolean);
-      parts.forEach(p => {
-        const countMatch = p.match(/^(\d+)\s+/);
-        const count = countMatch ? parseInt(countMatch[1], 10) : 1;
-        const weightMatch = p.match(/(\d+\s*-\s*\d+\s*(?:lb|lbs|kg|kgs)|\d+\s*(?:lb|lbs|kg|kgs))/i);
-        const weight = weightMatch ? weightMatch[1].replace(/\s+/g, "") : null;
-        const name = normalizeName(p.replace(/^\d+\s+/, "").replace(weightMatch ? weightMatch[0] : "", "").trim());
-        addItem(name, count, weight);
-      });
-    });
-    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
-  };
-
-  const circuitEquipment = summarizeEquipment(circuitExercises);
-
   // Auto-select first circuit station when list changes
   React.useEffect(() => {
     if (circuitExercises.length > 0 && (circuitStIdx < 0 || circuitStIdx >= circuitExercises.length)) {
@@ -2018,25 +1977,6 @@ function App() {
                     </div>
                   </div>
 
-                  {/* Equipment list */}
-                  <div style={{background:BH.white, borderRadius:"8px", border:`1px solid ${BH.g300}`,
-                               marginTop:"12px", padding:"12px 14px"}}>
-                    <div style={{fontSize:"12px", fontWeight:"bold", color:BH.navy, marginBottom:"6px"}}>
-                      Equipment Needed
-                    </div>
-                    {circuitEquipment.length === 0 ? (
-                      <div style={{fontSize:"12px", color:BH.g500}}>No equipment required.</div>
-                    ) : (
-                      <div style={{display:"flex", flexDirection:"column", gap:"4px"}}>
-                        {circuitEquipment.map(item => (
-                          <div key={item.name} style={{fontSize:"12px", color:BH.g700, display:"flex", justifyContent:"space-between"}}>
-                            <span>{item.name}{item.weights.size ? ` (${Array.from(item.weights).join(", ")})` : ""}</span>
-                            <span style={{color:BH.g500}}>x{item.count}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
                 )}
               </div>
 
@@ -2165,45 +2105,6 @@ function App() {
                     </div>
                   </div>
 
-                  {/* Equipment list */}
-                  <div style={{background:BH.white, borderRadius:"8px", border:`1px solid ${BH.g300}`,
-                               marginTop:"12px", padding:"12px 14px"}}>
-                    <div style={{fontSize:"12px", fontWeight:"bold", color:BH.navy, marginBottom:"6px"}}>
-                      Equipment Needed
-                    </div>
-                    {circuitEquipment.length === 0 ? (
-                      <div style={{fontSize:"12px", color:BH.g500}}>No equipment required.</div>
-                    ) : (
-                      <div style={{display:"flex", flexDirection:"column", gap:"4px"}}>
-                        {circuitEquipment.map(item => (
-                          <div key={item.name} style={{fontSize:"12px", color:BH.g700, display:"flex", justifyContent:"space-between"}}>
-                            <span>{item.name}{item.weights.size ? ` (${Array.from(item.weights).join(", ")})` : ""}</span>
-                            <span style={{color:BH.g500}}>x{item.count}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Equipment list */}
-                  <div style={{background:BH.white, borderRadius:"8px", border:`1px solid ${BH.g300}`,
-                               marginTop:"12px", padding:"12px 14px"}}>
-                    <div style={{fontSize:"12px", fontWeight:"bold", color:BH.navy, marginBottom:"6px"}}>
-                      Equipment Needed
-                    </div>
-                    {circuitEquipment.length === 0 ? (
-                      <div style={{fontSize:"12px", color:BH.g500}}>No equipment required.</div>
-                    ) : (
-                      <div style={{display:"flex", flexDirection:"column", gap:"4px"}}>
-                        {circuitEquipment.map(item => (
-                          <div key={item.name} style={{fontSize:"12px", color:BH.g700, display:"flex", justifyContent:"space-between"}}>
-                            <span>{item.name}{item.weights.size ? ` (${Array.from(item.weights).join(", ")})` : ""}</span>
-                            <span style={{color:BH.g500}}>x{item.count}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
 
                   {/* Equipment list */}
                   <div style={{background:BH.white, borderRadius:"8px", border:`1px solid ${BH.g300}`,
