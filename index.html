@@ -1609,46 +1609,54 @@ function DrillTimer({duration, resetKey, onNext, canNext, isAdmin, session, onAd
   const canAdmin = isAdmin && (!sessionMode || !!session);
   const startLabel = status === "running" ? "Pause" : status === "paused" ? "Resume" : "Start";
 
+  const statusText = sessionMode
+    ? (status === "running" ? "Coach is running the timer" : status === "paused" ? "Paused by coach" : "Waiting for coach...")
+    : "";
+
   return (
     <div style={{background:BH.white, border:`1px solid ${BH.g300}`, borderRadius:"8px", padding:"12px 14px", marginBottom:"10px"}}>
       <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"8px", gap:"8px"}}>
         <div style={{fontSize:"12px", fontWeight:"bold", color:BH.navy}}>Drill Timer</div>
         <div style={{fontSize:"18px", fontWeight:"bold", color:BH.maroon}}>{mm}:{ss}</div>
       </div>
-      <div style={{display:"flex", gap:"8px", flexWrap:"wrap"}}>
-        {sessionMode ? (
-          <>
-            <button
-              onClick={() => {
-                if (!canAdmin) return;
-                if (status === "running") onAdminPause();
-                else if (status === "paused") onAdminResume();
-                else onAdminStart();
-              }}
-              disabled={!canAdmin}
-              style={{...btn(status === "running" ? BH.shotRed : BH.shotBlue), cursor:canAdmin ? "pointer" : "not-allowed", opacity:canAdmin ? 1 : 0.6}}>
-              {startLabel}
-            </button>
-            <button onClick={() => { if (canAdmin) onAdminReset(); }} disabled={!canAdmin}
-              style={{...btn(BH.g500), cursor:canAdmin ? "pointer" : "not-allowed", opacity:canAdmin ? 1 : 0.6}}>Reset</button>
-          </>
-        ) : (
-          <>
-            <button onClick={() => { if (isAdmin) setRunning(r => !r); }} disabled={!isAdmin}
-              style={{...btn(running ? BH.shotRed : BH.shotBlue), cursor:isAdmin ? "pointer" : "not-allowed", opacity:isAdmin ? 1 : 0.6}}>
-              {running ? "Pause" : "Start"}
-            </button>
-            <button onClick={() => { if (isAdmin) setTimeLeft(duration); }} disabled={!isAdmin}
-              style={{...btn(BH.g500), cursor:isAdmin ? "pointer" : "not-allowed", opacity:isAdmin ? 1 : 0.6}}>Reset</button>
-            <button onClick={() => { if (isAdmin) setTimeLeft(t => t + 30); }} disabled={!isAdmin}
-              style={{...btn(BH.navy), cursor:isAdmin ? "pointer" : "not-allowed", opacity:isAdmin ? 1 : 0.6}}>+30s</button>
-          </>
-        )}
-        <button onClick={onNext} disabled={!canNext} style={{
-          ...btn(canNext ? BH.maroon : BH.g300),
-          cursor: canNext ? "pointer" : "not-allowed"
-        }}>Next Drill</button>
-      </div>
+      {isAdmin ? (
+        <div style={{display:"flex", gap:"8px", flexWrap:"wrap"}}>
+          {sessionMode ? (
+            <>
+              <button
+                onClick={() => {
+                  if (!canAdmin) return;
+                  if (status === "running") onAdminPause();
+                  else if (status === "paused") onAdminResume();
+                  else onAdminStart();
+                }}
+                disabled={!canAdmin}
+                style={{...btn(status === "running" ? BH.shotRed : BH.shotBlue), cursor:canAdmin ? "pointer" : "not-allowed", opacity:canAdmin ? 1 : 0.6}}>
+                {startLabel}
+              </button>
+              <button onClick={() => { if (canAdmin) onAdminReset(); }} disabled={!canAdmin}
+                style={{...btn(BH.g500), cursor:canAdmin ? "pointer" : "not-allowed", opacity:canAdmin ? 1 : 0.6}}>Reset</button>
+            </>
+          ) : (
+            <>
+              <button onClick={() => { if (isAdmin) setRunning(r => !r); }} disabled={!isAdmin}
+                style={{...btn(running ? BH.shotRed : BH.shotBlue), cursor:isAdmin ? "pointer" : "not-allowed", opacity:isAdmin ? 1 : 0.6}}>
+                {running ? "Pause" : "Start"}
+              </button>
+              <button onClick={() => { if (isAdmin) setTimeLeft(duration); }} disabled={!isAdmin}
+                style={{...btn(BH.g500), cursor:isAdmin ? "pointer" : "not-allowed", opacity:isAdmin ? 1 : 0.6}}>Reset</button>
+              <button onClick={() => { if (isAdmin) setTimeLeft(t => t + 30); }} disabled={!isAdmin}
+                style={{...btn(BH.navy), cursor:isAdmin ? "pointer" : "not-allowed", opacity:isAdmin ? 1 : 0.6}}>+30s</button>
+            </>
+          )}
+          <button onClick={onNext} disabled={!canNext} style={{
+            ...btn(canNext ? BH.maroon : BH.g300),
+            cursor: canNext ? "pointer" : "not-allowed"
+          }}>Next Drill</button>
+        </div>
+      ) : (
+        <div style={{fontSize:"12px", color:BH.g600}}>{statusText}</div>
+      )}
     </div>
   );
 }
@@ -2202,7 +2210,12 @@ function App() {
   const canNextDrill = currentDrillIdx >= 0 && currentDrillIdx < orderedDrillIds.length - 1;
   const goNextDrill = () => {
     if (!canNextDrill) return;
-    setViewDrill(orderedDrillIds[currentDrillIdx + 1]);
+    const nextId = orderedDrillIds[currentDrillIdx + 1];
+    setViewDrill(nextId);
+    if (admin) {
+      const nextDur = (selDrills.find(d => d.id === nextId) || {}).time || drillTime;
+      updateDrillRow({ drill_id: nextId, duration: Math.max(1, Number(nextDur) || 0) });
+    }
   };
 
   // Admin's selected exercises for circuit
