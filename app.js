@@ -271,7 +271,7 @@ function App() {
   ];
   const SUPABASE_URL = "https://uievqtckkotplvyfqshu.supabase.co";
   const SUPABASE_ANON_KEY = "sb_publishable_8YcUvmNO3QWfFqOnqMKcdg_y_-L2QRg";
-  const sb = React.useMemo(() => supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY), []);
+  const sb = React.useMemo(() => (window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null), []);
   const sbRest = async (path, opts = {}) => {
     const headers = Object.assign({
       apikey: SUPABASE_ANON_KEY,
@@ -370,6 +370,7 @@ function App() {
   // Auth state
   React.useEffect(() => {
     let active = true;
+    if (!sb) return;
     sb.auth.getSession().then(({ data }) => {
       if (active) setUser(data && data.session ? data.session.user : null);
     });
@@ -385,6 +386,7 @@ function App() {
   // Load circuit session + subscribe to realtime
   React.useEffect(() => {
     let channel = null;
+    if (!sb) return;
     const loadSession = async () => {
       const { data, error } = await sb.from("circuit_session").select("*").eq("id", 1).single();
       if (!error) setSession(data);
@@ -413,6 +415,7 @@ function App() {
 
   // Login/logout handlers
   const handleLogin = async (email, password) => {
+    if (!sb) return false;
     const { data, error } = await sb.auth.signInWithPassword({ email, password });
     if (error || !data || !data.user) return false;
     const isAllowed = ADMIN_EMAILS.includes((data.user.email || "").toLowerCase());
@@ -424,6 +427,7 @@ function App() {
     return true;
   };
   const handleLogout = async () => {
+    if (!sb) return;
     await sb.auth.signOut();
   };
 
@@ -440,6 +444,7 @@ function App() {
         setTimeout(() => setToast(""), 3000);
       });
     };
+    if (!sb) { doLocalPublish(); return; }
     const { error } = await sb.from("published_plan").upsert({ id: 1, data: cfg });
     if (error) {
       doLocalPublish();
@@ -553,6 +558,7 @@ function App() {
   };
   const adminStart = async () => {
     const stations = circuitExercises.map(e => e.id);
+    if (!sb) return;
     await sb.from("circuit_session").update({
       status: "running",
       start_time: new Date().toISOString(),
@@ -564,6 +570,7 @@ function App() {
     }).eq("id", 1);
   };
   const adminPause = async () => {
+    if (!sb) return;
     await sb.from("circuit_session").update({
       status: "paused",
       elapsed_at_pause: calcElapsed()
@@ -571,12 +578,14 @@ function App() {
   };
   const adminResume = async () => {
     const elapsed = session && session.elapsed_at_pause ? session.elapsed_at_pause : 0;
+    if (!sb) return;
     await sb.from("circuit_session").update({
       status: "running",
       start_time: new Date(Date.now() - elapsed * 1000).toISOString()
     }).eq("id", 1);
   };
   const adminReset = async () => {
+    if (!sb) return;
     await sb.from("circuit_session").update({
       status: "idle",
       start_time: null,
