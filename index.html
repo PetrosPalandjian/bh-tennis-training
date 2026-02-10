@@ -2217,7 +2217,12 @@ function App() {
     if (error) {
       setToast("Stretch timer update failed. Check Supabase policies.");
       setTimeout(() => setToast(""), 4000);
+      return;
     }
+    setStretchSession(prev => {
+      const base = prev || { id: 1 };
+      return Object.assign({}, base, patch);
+    });
   };
   const updateStretchSettings = async (nextDyn, nextDynRest, nextStat, nextStatRest) => {
     await updateStretchRow({
