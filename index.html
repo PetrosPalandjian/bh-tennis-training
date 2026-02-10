@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- build: v2026-02-08-01 -->
+<!-- build: v2026-02-10-auth-sync -->
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -20,8 +20,6 @@
 <body>
   <div id="root"></div>
 
-  <!-- Inlined to avoid file:// CORS issues with Babel fetching src -->
-  <!-- build: 2026-02-10 00:11 -->
   <script type="text/babel">
 // === data.js ===
 const BH = {
@@ -1031,34 +1029,77 @@ function CircuitTimer({work, rest, rounds, exercises, onStation, onPhaseInfo, se
   const [stIdx, setStIdx] = React.useState(0);
   const [round, setRound] = React.useState(1);
   const timerRef = React.useRef(null);
+  const [nowTs, setNowTs] = React.useState(Date.now());
 
   const totalStations = exercises.length;
   const dur = phase === "station" || phase === "pausedStation" ? work : phase === "rest" || phase === "pausedRest" ? rest : 0;
+  const sessionMode = !!session;
 
-  // Reset everything when exercises change
+  function deriveFromSession() {
+    if (!session || totalStations <= 0 || rounds <= 0) {
+      return { phase: "idle", remaining: 0, round: 1, stIdx: 0 };
+    }
+    const status = session.status || "idle";
+    if (status === "idle" || !session.start_time) {
+      return { phase: "idle", remaining: 0, round: 1, stIdx: 0 };
+    }
+    const elapsed = status === "paused"
+      ? (session.elapsed_at_pause || 0)
+      : Math.max(0, Math.floor((nowTs - Date.parse(session.start_time)) / 1000));
+    const unit = work + rest;
+    const totalStationsAll = totalStations * rounds;
+    const totalDuration = totalStationsAll > 0 ? (totalStationsAll - 1) * unit + work : 0;
+    if (elapsed >= totalDuration) {
+      return { phase: "done", remaining: 0, round: rounds, stIdx: totalStations - 1 };
+    }
+    let blockIndex = 0;
+    let timeInBlock = elapsed;
+    if (totalStationsAll > 1) {
+      const lastStart = (totalStationsAll - 1) * unit;
+      if (elapsed >= lastStart) {
+        blockIndex = totalStationsAll - 1;
+        timeInBlock = elapsed - lastStart;
+      } else {
+        blockIndex = Math.floor(elapsed / unit);
+        timeInBlock = elapsed % unit;
+      }
+    }
+    const st = blockIndex % totalStations;
+    const rd = Math.floor(blockIndex / totalStations) + 1;
+    const isWork = timeInBlock < work;
+    const rem = isWork ? (work - timeInBlock) : (unit - timeInBlock);
+    let ph = isWork ? "station" : "rest";
+    if (status === "paused") ph = ph === "station" ? "pausedStation" : "pausedRest";
+    return { phase: ph, remaining: rem, round: rd, stIdx: st };
+  }
+
+  const derived = sessionMode ? deriveFromSession() : null;
+
+  // Reset everything when exercises change (local mode only)
   React.useEffect(() => {
+    if (sessionMode) return;
     if (timerRef.current) clearInterval(timerRef.current);
     timerRef.current = null;
     setPhase("idle");
     setTime(0);
     setStIdx(0);
     setRound(1);
-  }, [exercises.length]);
+  }, [exercises.length, sessionMode]);
 
   // Expose phase info to parent
   React.useEffect(() => {
     if (onPhaseInfo) {
       onPhaseInfo({
-        phase,
-        time,
-        round,
-        stIdx,
-        remaining: Math.max(0, dur - time),
+        phase: sessionMode ? derived.phase : phase,
+        time: sessionMode ? (dur - derived.remaining) : time,
+        round: sessionMode ? derived.round : round,
+        stIdx: sessionMode ? derived.stIdx : stIdx,
+        remaining: sessionMode ? derived.remaining : Math.max(0, dur - time),
         totalStations,
         rounds
       });
     }
-  }, [phase, time, round, stIdx, dur, totalStations, rounds, onPhaseInfo]);
+  }, [phase, time, round, stIdx, dur, totalStations, rounds, onPhaseInfo, sessionMode, derived]);
 
   const tick = React.useCallback(() => {
     setTime(t => {
@@ -1113,15 +1154,30 @@ function CircuitTimer({work, rest, rounds, exercises, onStation, onPhaseInfo, se
     });
   }, [phase, dur, totalStations, rounds, onStation]);
 
-  // Run timer
+  // Run timer (local mode only)
   React.useEffect(() => {
+    if (sessionMode) return;
     if (phase === "station" || phase === "rest") {
       timerRef.current = setInterval(tick, 1000);
       return () => {
         if (timerRef.current) clearInterval(timerRef.current);
       };
     }
-  }, [phase, tick]);
+  }, [phase, tick, sessionMode]);
+
+  // Tick clock for session mode
+  React.useEffect(() => {
+    if (!sessionMode) return;
+    if (!session || session.status !== "running") return;
+    const t = setInterval(() => setNowTs(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [sessionMode, session && session.status]);
+
+  // Sync selection for session mode
+  React.useEffect(() => {
+    if (!sessionMode || !onStation || !derived) return;
+    onStation(derived.stIdx);
+  }, [sessionMode, derived && derived.stIdx, onStation]);
 
   function start() {
     setPhase("station");
@@ -1152,10 +1208,11 @@ function CircuitTimer({work, rest, rounds, exercises, onStation, onPhaseInfo, se
     if (onStation) onStation(-1);
   }
 
-  const remaining = Math.max(0, dur - time);
-  const isRunning = phase === "station" || phase === "rest";
-  const isPaused = phase === "pausedStation" || phase === "pausedRest";
-  const isWork = phase === "station" || phase === "pausedStation";
+  const effectivePhase = sessionMode ? derived.phase : phase;
+  const remaining = sessionMode ? derived.remaining : Math.max(0, dur - time);
+  const isRunning = effectivePhase === "station" || effectivePhase === "rest";
+  const isPaused = effectivePhase === "pausedStation" || effectivePhase === "pausedRest";
+  const isWork = effectivePhase === "station" || effectivePhase === "pausedStation";
   const col = isWork ? BH.shotBlue : BH.shotGold;
 
   return (
@@ -1174,12 +1231,12 @@ function CircuitTimer({work, rest, rounds, exercises, onStation, onPhaseInfo, se
       <div style={{
         fontSize: "42px",
         fontWeight: "bold",
-        color: phase === "idle" ? BH.g400 : col,
+        color: effectivePhase === "idle" ? BH.g400 : col,
         minWidth: "80px",
         textAlign: "center",
         fontVariantNumeric: "tabular-nums"
       }}>
-        {phase === "idle" ? "—" : phase === "done" ? "✓" : remaining}
+        {effectivePhase === "idle" ? "—" : effectivePhase === "done" ? "✓" : remaining}
       </div>
 
       {/* Divider */}
@@ -1187,25 +1244,27 @@ function CircuitTimer({work, rest, rounds, exercises, onStation, onPhaseInfo, se
 
       {/* Phase label and info */}
       <div style={{flex: 1}}>
-        {phase === "idle" && (
-          <div style={{color: BH.g500, fontSize: "13px"}}>Ready to start</div>
+        {effectivePhase === "idle" && (
+          <div style={{color: BH.g500, fontSize: "13px"}}>
+            {isAdmin ? "Ready to start" : "Waiting for coach..."}
+          </div>
         )}
-        {phase === "done" && (
+        {effectivePhase === "done" && (
           <div style={{fontWeight: "bold", color: BH.maroon}}>CIRCUIT COMPLETE!</div>
         )}
-        {(phase === "station" || phase === "pausedStation") && (
+        {(effectivePhase === "station" || effectivePhase === "pausedStation") && (
           <>
             <div style={{fontWeight: "bold", color: BH.shotBlue, marginBottom: "2px"}}>WORK</div>
             <div style={{fontSize: "12px", color: BH.g500}}>
-              Round {round}/{rounds} • Station {stIdx + 1}/{totalStations}
+              Round {sessionMode ? derived.round : round}/{rounds} • Station {(sessionMode ? derived.stIdx : stIdx) + 1}/{totalStations}
             </div>
           </>
         )}
-        {(phase === "rest" || phase === "pausedRest") && (
+        {(effectivePhase === "rest" || effectivePhase === "pausedRest") && (
           <>
             <div style={{fontWeight: "bold", color: BH.shotGold, marginBottom: "2px"}}>REST</div>
             <div style={{fontSize: "12px", color: BH.g500}}>
-              Round {round}/{rounds} • Next: Station {(stIdx + 1) % totalStations + 1}
+              Round {sessionMode ? derived.round : round}/{rounds} • Next: Station {((sessionMode ? derived.stIdx : stIdx) + 1) % totalStations + 1}
             </div>
           </>
         )}
@@ -1213,62 +1272,66 @@ function CircuitTimer({work, rest, rounds, exercises, onStation, onPhaseInfo, se
 
       {/* Control buttons */}
       <div style={{display: "flex", gap: "8px"}}>
-        {phase === "idle" && (
-          <button onClick={start} style={{
+        {effectivePhase === "idle" && (
+          <button onClick={sessionMode ? onAdminStart : start} disabled={sessionMode && !isAdmin} style={{
             padding: "8px 16px",
             background: BH.shotBlue,
             color: BH.white,
             border: "none",
             borderRadius: "4px",
-            cursor: "pointer",
+            cursor: sessionMode && !isAdmin ? "not-allowed" : "pointer",
             fontSize: "13px",
             fontWeight: "bold",
-            whiteSpace: "nowrap"
+            whiteSpace: "nowrap",
+            opacity: sessionMode && !isAdmin ? 0.5 : 1
           }}>
             START
           </button>
         )}
         {isRunning && (
-          <button onClick={pause} style={{
+          <button onClick={sessionMode ? onAdminPause : pause} disabled={sessionMode && !isAdmin} style={{
             padding: "8px 14px",
             background: BH.shotGold,
             color: BH.navy,
             border: "none",
             borderRadius: "4px",
-            cursor: "pointer",
+            cursor: sessionMode && !isAdmin ? "not-allowed" : "pointer",
             fontSize: "13px",
             fontWeight: "bold",
-            whiteSpace: "nowrap"
+            whiteSpace: "nowrap",
+            opacity: sessionMode && !isAdmin ? 0.5 : 1
           }}>
             PAUSE
           </button>
         )}
         {isPaused && (
-          <button onClick={resume} style={{
+          <button onClick={sessionMode ? onAdminResume : resume} disabled={sessionMode && !isAdmin} style={{
             padding: "8px 14px",
             background: BH.shotBlue,
             color: BH.white,
             border: "none",
             borderRadius: "4px",
-            cursor: "pointer",
+            cursor: sessionMode && !isAdmin ? "not-allowed" : "pointer",
             fontSize: "13px",
             fontWeight: "bold",
-            whiteSpace: "nowrap"
+            whiteSpace: "nowrap",
+            opacity: sessionMode && !isAdmin ? 0.5 : 1
           }}>
             RESUME
           </button>
         )}
-        {(isRunning || isPaused || phase === "done") && (
-          <button onClick={reset} style={{
+        {(isRunning || isPaused || effectivePhase === "done") && (
+          <button onClick={sessionMode ? onAdminReset : reset} disabled={sessionMode && !isAdmin} style={{
             padding: "8px 14px",
             background: BH.g400,
             color: BH.white,
             border: "none",
             borderRadius: "4px",
-            cursor: "pointer",
+            cursor: sessionMode && !isAdmin ? "not-allowed" : "pointer",
             fontSize: "13px",
             fontWeight: "bold",
-            whiteSpace: "nowrap"
+            whiteSpace: "nowrap",
+            opacity: sessionMode && !isAdmin ? 0.5 : 1
           }}>
             RESET
           </button>
@@ -1501,33 +1564,30 @@ function DrillTimer({duration, resetKey, onNext, canNext}) {
   );
 }
 
-// LoginModal Component
+// LoginModal Component (Supabase email/password)
 function LoginModal({onLogin, onClose}) {
-  const [un, setUn] = React.useState("");
+  const [email, setEmail] = React.useState("");
   const [pw, setPw] = React.useState("");
   const [err, setErr] = React.useState("");
 
   const handleLogin = async () => {
-    if (!un.trim() || !pw.trim()) { setErr("Enter username and password"); return; }
-    const pwh = await sha256(pw);
-    if (un === "BHTennis" && pwh === "b58f004c95d0a0c859256c96ac33f70e5ccc9cadaf17997425f883bbcbb6cfdd") {
-      setErr("");
-      onLogin();
-    } else {
-      setErr("Invalid credentials");
-    }
+    setErr("");
+    const e = email.trim().toLowerCase();
+    if (!e || !pw) { setErr("Enter email and password"); return; }
+    const ok = await onLogin(e, pw);
+    if (!ok) setErr("Invalid credentials or not authorized");
   };
 
   return (
     <div style={{position:"fixed", top:0, left:0, right:0, bottom:0, background:"rgba(0,0,0,0.5)",
                  display:"flex", alignItems:"center", justifyContent:"center", zIndex:1000}}>
-      <div style={{background:BH.white, padding:"32px", borderRadius:"12px", width:"100%", maxWidth:"340px",
+      <div style={{background:BH.white, padding:"32px", borderRadius:"12px", width:"100%", maxWidth:"360px",
                    boxShadow:"0 10px 40px rgba(0,0,0,0.2)"}}>
         <div style={{textAlign:"center", marginBottom:"20px"}}>
           <div style={{fontSize:"20px", fontWeight:"bold", color:BH.navy}}>Admin Login</div>
           <div style={{fontSize:"12px", color:BH.g500, marginTop:"4px"}}>Belmont Hill Tennis</div>
         </div>
-        <input type="text" placeholder="Username" value={un} onChange={e => setUn(e.target.value)}
+        <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)}
           style={{width:"100%", padding:"10px 12px", marginBottom:"12px", border:`1px solid ${BH.g300}`,
                   borderRadius:"6px", fontSize:"14px", boxSizing:"border-box"}}
           onKeyDown={e => e.key === "Enter" && handleLogin()}/>
@@ -2365,1466 +2425,6 @@ function App() {
                                style={{marginLeft:"auto", fontSize:"10px", color:BH.g200, textDecoration:"underline"}}>
                               Open on YouTube
                             </a>
-                          </div>
-                          <div style={{position:"relative", paddingBottom:"56.25%", height:0, overflow:"hidden"}}>
-                            <iframe
-                              src={`https://www.youtube.com/embed/${circuitExercises[circuitStIdx].youtubeId}?${circuitExercises[circuitStIdx].youtubeStart ? "start="+circuitExercises[circuitStIdx].youtubeStart : ""}${circuitExercises[circuitStIdx].youtubeEnd ? "&end="+circuitExercises[circuitStIdx].youtubeEnd : ""}&rel=0&modestbranding=1`}
-                              frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope"
-                              allowFullScreen style={{position:"absolute", top:0, left:0, width:"100%", height:"100%"}}/>
-                          </div>
-                        </div>
-                    )}
-                  </div>
-                )}
-                </>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// Mount the app
-const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(<App/>);
-
-
-</script>
-  <script type="text/babel">
-// Court Components for Belmont Hill Tennis Training Web App
-// Loaded via <script type="text/babel"> - uses global variables from data.js
-
-/**
- * Shot Type Abbreviations & Colors
- * Used as badges on player markers, Sportplan-style
- */
-const SHOT_INFO = {
-  forehand:  { abbr: "FH", icon: "→" },
-  backhand:  { abbr: "BH", icon: "←" },
-  serve:     { abbr: "SV", icon: "↑" },
-  fh_volley: { abbr: "FV", icon: "⤴" },
-  bh_volley: { abbr: "BV", icon: "⤵" },
-  overhead:  { abbr: "OH", icon: "⬆" },
-  slice_fh:  { abbr: "SF", icon: "↗" },
-  slice_bh:  { abbr: "SB", icon: "↖" },
-};
-
-/**
- * PlayerIcon Component — Sportplan-style clean marker
- *
- * Design: Colored circle with player letter in center,
- * small shot-type badge offset to the side when active.
- * Clean, readable on iPad screens at any size.
- */
-function PlayerIcon({px, py, color, label, shot, courtY}) {
-  const isFar = courtY < 50;
-  const info = shot ? SHOT_INFO[shot] : null;
-
-  // Main circle radius
-  const r = 16;
-  // Badge offset direction (show badge toward center of court for readability)
-  const badgeX = 14;
-  const badgeY = isFar ? 14 : -14;
-
-  return (
-    <g style={{transform:`translate(${px}px,${py}px)`, transition:"transform 0.4s ease-in-out"}}>
-      {/* Drop shadow for depth */}
-      <circle cx={1} cy={2} r={r} fill="rgba(0,0,0,0.25)"/>
-
-      {/* Main player circle */}
-      <circle cx={0} cy={0} r={r} fill={color} stroke={BH.white} strokeWidth={2.5}/>
-
-      {/* Player label (letter) centered */}
-      <text x={0} y={1} textAnchor="middle" dominantBaseline="middle"
-            fontSize="14" fontWeight="900" fill={BH.white}
-            style={{letterSpacing:"0.5px"}}>{label}</text>
-
-      {/* Shot-type badge when active */}
-      {info && (
-        <g>
-          <rect x={badgeX - 13} y={badgeY - 7} width={26} height={14}
-                rx={3} fill={BH.navy} stroke={BH.white} strokeWidth={1.2}/>
-          <text x={badgeX} y={badgeY + 1} textAnchor="middle" dominantBaseline="middle"
-                fontSize="8" fontWeight="bold" fill={BH.white}
-                style={{letterSpacing:"0.5px"}}>{info.abbr}</text>
-        </g>
-      )}
-
-      {/* Direction indicator - small arrow showing facing direction */}
-      {!info && (
-        <g>
-          {isFar ? (
-            <polygon points="-4,-20 4,-20 0,-25" fill={color} stroke={BH.white} strokeWidth={1} opacity={0.7}/>
-          ) : (
-            <polygon points="-4,20 4,20 0,25" fill={color} stroke={BH.white} strokeWidth={1} opacity={0.7}/>
-          )}
-        </g>
-      )}
-    </g>
-  );
-}
-
-/**
- * Court Component
- * Renders full tennis court SVG with white lines, service boxes, net, and overlays
- * Displays shot arrows and player icons
- * Now includes smooth animated transitions via SVG <animate> elements
- */
-function Court({courtType, players, steps, activeStep, showAll}) {
-  const L = CRT.PAD, R = CRT.W - CRT.PAD, T = CRT.PAD, B = CRT.H - CRT.PAD;
-
-  // Filter visible steps
-  const vis = steps.filter((_, i) => showAll || i <= activeStep);
-
-  // Find the active hitter and their shot for PlayerIcon rendering
-  const activeS = steps[activeStep];
-  const hId = activeS && activeS.t === "hit" ? activeS.hitter : null;
-  const hShot = activeS ? activeS.shot : null;
-
-  // Arrow rendering function
-  function arrow(s, i) {
-    const x1 = mX(s.f[0]), y1 = mY(s.f[1]);
-    const x2 = mX(s.to[0]), y2 = mY(s.to[1]);
-    const isActive = i === activeStep;
-    const op = isActive ? 1 : 0.35;
-    const sw = isActive ? 3 : 1.8;
-    const col = s.c || BH.shotBlue;
-    const dashArr = s.t === "move" ? "6,4" : "none";
-    const markerId = `ah${i}`;
-
-    return (
-      <g key={i} opacity={op} style={{transition:"opacity 0.3s ease"}}>
-        <defs>
-          <marker id={markerId} markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
-            <path d="M0,0 L10,4 L0,8 Z" fill={col}/>
-          </marker>
-        </defs>
-        <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={col} strokeWidth={sw}
-              markerEnd={`url(#${markerId})`} strokeDasharray={dashArr}/>
-        {/* Step number badge on arrow midpoint */}
-        {s.t === "hit" && s.n && (
-          <g>
-            <circle cx={(x1+x2)/2} cy={(y1+y2)/2} r={10} fill={BH.navy} stroke={BH.white} strokeWidth={1.5}/>
-            <text x={(x1+x2)/2} y={(y1+y2)/2+1} textAnchor="middle" dominantBaseline="middle"
-                  fontSize="9" fontWeight="bold" fill={BH.white}>{s.n}</text>
-          </g>
-        )}
-        {/* Note label on active arrow */}
-        {s.note && isActive && (
-          <text x={(x1+x2)/2} y={(y1+y2)/2 - 16} textAnchor="middle"
-                fontSize="9" fontWeight="bold" fill={BH.navy}
-                stroke={BH.white} strokeWidth={3} paintOrder="stroke">{s.note}</text>
-        )}
-      </g>
-    );
-  }
-
-  return (
-    <svg viewBox={`0 0 ${CRT.W} ${CRT.H}`}
-         style={{width:"100%", maxWidth:360, background:BH.courtDark, borderRadius:12}}>
-      {/* Court surface */}
-      <rect x={L} y={T} width={R-L} height={B-T} fill={BH.courtGreen} rx={2}/>
-
-      {/* Court outline - white */}
-      <rect x={L} y={T} width={R-L} height={B-T} fill="none" stroke={BH.white} strokeWidth={2}/>
-
-      {/* Singles sidelines */}
-      <line x1={SL.l} y1={T} x2={SL.l} y2={B} stroke={BH.white} strokeWidth={1.5}/>
-      <line x1={SL.r} y1={T} x2={SL.r} y2={B} stroke={BH.white} strokeWidth={1.5}/>
-
-      {/* Service box lines */}
-      <line x1={SL.l} y1={SVC.far} x2={SL.r} y2={SVC.far} stroke={BH.white} strokeWidth={1.5}/>
-      <line x1={SL.l} y1={SVC.near} x2={SL.r} y2={SVC.near} stroke={BH.white} strokeWidth={1.5}/>
-
-      {/* Center service line */}
-      <line x1={mX(50)} y1={SVC.far} x2={mX(50)} y2={SVC.near} stroke={BH.white} strokeWidth={1.5}/>
-
-      {/* Center marks at baselines */}
-      <line x1={mX(50)} y1={T} x2={mX(50)} y2={T+12} stroke={BH.white} strokeWidth={1.5}/>
-      <line x1={mX(50)} y1={B} x2={mX(50)} y2={B-12} stroke={BH.white} strokeWidth={1.5}/>
-
-      {/* Net with posts */}
-      <line x1={L-8} y1={NET_Y} x2={R+8} y2={NET_Y} stroke={BH.white} strokeWidth={3}/>
-      <line x1={L-8} y1={NET_Y} x2={L-8} y2={NET_Y-8} stroke={BH.white} strokeWidth={2}/>
-      <line x1={R+8} y1={NET_Y} x2={R+8} y2={NET_Y-8} stroke={BH.white} strokeWidth={2}/>
-
-      {/* Shot arrows */}
-      {vis.map((s, i) => arrow(s, i))}
-
-      {/* Player icons */}
-      {players.map(p => (
-        <PlayerIcon key={p.id}
-          px={mX(p.x)} py={mY(p.y)}
-          color={p.color} label={p.id}
-          shot={p.id === hId ? hShot : null}
-          courtY={p.y}/>
-      ))}
-    </svg>
-  );
-}
-
-  </script>
-  <script type="text/babel">
-/**
- * Circuit Training Components
- * Belmont Hill Tennis Training Web App
- *
- * Components:
- * - CircuitRing: Circular station layout
- * - CircuitTimer: Compact horizontal countdown timer with state machine
- */
-
-/**
- * CircuitRing Component
- * Renders stations in a circle with dynamic sizing based on number of stations
- * All stations are same color (navy). Selected station gets subtle highlight.
- */
-function CircuitRing({stations, selectedIdx, onSelect, onRemove}) {
-  const n = stations.length;
-  if (n === 0) return (
-    <div style={{textAlign:"center", padding:"60px 20px", color:BH.g500, fontSize:"15px"}}>
-      Select exercises to build your circuit
-    </div>
-  );
-
-  const size = Math.max(320, Math.min(520, (typeof window !== "undefined" ? window.innerWidth : 520) - 40));
-  const padY = size * 0.08;
-  const width = size;
-  const height = size + padY * 2;
-  const cx = width / 2, cy = height / 2;
-  const rad = size * 0.385;
-  const nr = size * 0.092;
-  const fs = size < 420 ? 10 : 11;
-
-  // Helper to wrap text into multiple lines
-  function wrapText(text, maxLen) {
-    const words = text.split(" ");
-    const lines = [];
-    let currentLine = "";
-    for (const word of words) {
-      if ((currentLine + " " + word).trim().length <= maxLen) {
-        currentLine = currentLine ? currentLine + " " + word : word;
-      } else {
-        if (currentLine) lines.push(currentLine);
-        currentLine = word;
-      }
-    }
-    if (currentLine) lines.push(currentLine);
-    return lines;
-  }
-
-  return (
-    <svg width={width} height={height} style={{display:"block", margin:"0 auto", maxWidth:"100%"}}>
-      {/* Connecting ring */}
-      <circle cx={cx} cy={cy} r={rad} fill="none" stroke={BH.g300} strokeWidth={1} strokeDasharray="4,3"/>
-
-      {/* Center label */}
-      <text x={cx} y={cy-6} textAnchor="middle" fontSize="13" fontWeight="bold" fill={BH.navy}>CIRCUIT</text>
-      <text x={cx} y={cy+10} textAnchor="middle" fontSize="11" fill={BH.g500}>{n} stations</text>
-
-      {/* Station nodes */}
-      {stations.map((s, i) => {
-        const ang = (i / n) * Math.PI * 2 - Math.PI / 2;
-        const x = cx + rad * Math.cos(ang);
-        const y = cy + rad * Math.sin(ang);
-        const isSelected = i === selectedIdx;
-
-        // All stations are navy, selected gets gold border
-        const fillCol = BH.navy;
-        const strokeCol = isSelected ? BH.maroon : BH.g400;
-        const strokeW = isSelected ? 3 : 1.5;
-
-        // Wrap exercise name
-        const lines = wrapText(s.name, 10);
-        const stationNum = String(i + 1);
-
-        return (
-          <g key={s.id} style={{cursor: onSelect ? "pointer" : "default"}}
-             onClick={() => onSelect && onSelect(i)}>
-            <circle cx={x} cy={y} r={nr} fill={fillCol} stroke={strokeCol} strokeWidth={strokeW}/>
-
-            {/* Station number above */}
-            <text x={x} y={y - nr - 12} textAnchor="middle" fontSize="12" fontWeight="bold"
-                  fill={BH.navy} style={{pointerEvents:"none", paintOrder:"stroke", stroke:BH.white, strokeWidth:3}}>
-              {stationNum}
-            </text>
-
-            {/* Exercise name, wrapped */}
-            {lines.length === 1 && (
-              <text x={x} y={y + 2} textAnchor="middle" dominantBaseline="middle"
-                    fontSize={fs} fontWeight="bold" fill={BH.white}
-                    style={{pointerEvents:"none"}}>{lines[0]}</text>
-            )}
-            {lines.length === 2 && (
-              <>
-                <text x={x} y={y - 4} textAnchor="middle" dominantBaseline="middle"
-                      fontSize={fs} fontWeight="bold" fill={BH.white}
-                      style={{pointerEvents:"none"}}>{lines[0]}</text>
-                <text x={x} y={y + 8} textAnchor="middle" dominantBaseline="middle"
-                      fontSize={fs} fontWeight="bold" fill={BH.white}
-                      style={{pointerEvents:"none"}}>{lines[1]}</text>
-              </>
-            )}
-            {lines.length >= 3 && (
-              <>
-                <text x={x} y={y - 8} textAnchor="middle" dominantBaseline="middle"
-                      fontSize={fs} fontWeight="bold" fill={BH.white}
-                      style={{pointerEvents:"none"}}>{lines[0]}</text>
-                <text x={x} y={y + 2} textAnchor="middle" dominantBaseline="middle"
-                      fontSize={fs} fontWeight="bold" fill={BH.white}
-                      style={{pointerEvents:"none"}}>{lines[1]}</text>
-                <text x={x} y={y + 12} textAnchor="middle" dominantBaseline="middle"
-                      fontSize={fs} fontWeight="bold" fill={BH.white}
-                      style={{pointerEvents:"none"}}>{lines[2]}</text>
-              </>
-            )}
-
-            {/* Reps/sets info below */}
-            <text x={x} y={y + nr + 12} textAnchor="middle" fontSize="9"
-                  fill={BH.g500} style={{pointerEvents:"none"}}>{s.reps || ""}</text>
-
-            {/* Remove button (admin only) */}
-            {onRemove && (
-              <g style={{cursor:"pointer"}}
-                 onClick={(e) => { e.stopPropagation(); onRemove(i); }}>
-                <circle cx={x + nr * 0.7} cy={y - nr * 0.7} r={10}
-                        fill={BH.shotRed || "#E74C3C"} stroke={BH.white} strokeWidth={1.5}/>
-                <text x={x + nr * 0.7} y={y - nr * 0.7 + 1} textAnchor="middle"
-                      dominantBaseline="middle" fontSize="13" fontWeight="bold"
-                      fill={BH.white} style={{pointerEvents:"none"}}>×</text>
-              </g>
-            )}
-          </g>
-        );
-      })}
-    </svg>
-  );
-}
-
-/**
- * CircuitTimer Component
- * Compact horizontal countdown timer with state machine for circuit training
- * States: idle → station → rest → (loop) or done
- * Renders as a compact toolbar-style timer bar (~70px height)
- */
-function CircuitTimer({work, rest, rounds, exercises, onStation, onPhaseInfo, session, isAdmin, onAdminStart, onAdminPause, onAdminResume, onAdminReset}) {
-  const [phase, setPhase] = React.useState("idle");  // idle, station, rest, pausedStation, pausedRest, done
-  const [time, setTime] = React.useState(0);
-  const [stIdx, setStIdx] = React.useState(0);
-  const [round, setRound] = React.useState(1);
-  const timerRef = React.useRef(null);
-
-  const totalStations = exercises.length;
-  const dur = phase === "station" || phase === "pausedStation" ? work : phase === "rest" || phase === "pausedRest" ? rest : 0;
-
-  // Reset everything when exercises change
-  React.useEffect(() => {
-    if (timerRef.current) clearInterval(timerRef.current);
-    timerRef.current = null;
-    setPhase("idle");
-    setTime(0);
-    setStIdx(0);
-    setRound(1);
-  }, [exercises.length]);
-
-  // Expose phase info to parent
-  React.useEffect(() => {
-    if (onPhaseInfo) {
-      onPhaseInfo({
-        phase,
-        time,
-        round,
-        stIdx,
-        remaining: Math.max(0, dur - time),
-        totalStations,
-        rounds
-      });
-    }
-  }, [phase, time, round, stIdx, dur, totalStations, rounds, onPhaseInfo]);
-
-  const tick = React.useCallback(() => {
-    setTime(t => {
-      if (t + 1 >= dur) {
-        // Time's up for this phase
-        if (phase === "station") {
-          // Check if last station in round
-          setStIdx(si => {
-            if (si + 1 >= totalStations) {
-              // End of round
-              setRound(r => {
-                if (r >= rounds) {
-                  // All done!
-                  setPhase("done");
-                  snd.done();
-                  if (timerRef.current) clearInterval(timerRef.current);
-                  timerRef.current = null;
-                  return r;
-                }
-                // Next round - go to rest
-                snd.rest();
-                setPhase("rest");
-                return r;
-              });
-              return si;
-            }
-            // Next station, but rest first
-            snd.rest();
-            setPhase("rest");
-            return si;
-          });
-        } else if (phase === "rest") {
-          // Move to next station
-          setStIdx(si => {
-            let nextSi = si + 1;
-            if (nextSi >= totalStations) {
-              // New round
-              nextSi = 0;
-              setRound(r => r + 1);
-            }
-            if (onStation) onStation(nextSi);
-            return nextSi;
-          });
-          snd.go();
-          setPhase("station");
-        }
-        return 0;
-      }
-      // 3-second warning ticks
-      if (dur - (t + 1) <= 3 && dur - (t + 1) > 0) snd.tick();
-      return t + 1;
-    });
-  }, [phase, dur, totalStations, rounds, onStation]);
-
-  // Run timer
-  React.useEffect(() => {
-    if (phase === "station" || phase === "rest") {
-      timerRef.current = setInterval(tick, 1000);
-      return () => {
-        if (timerRef.current) clearInterval(timerRef.current);
-      };
-    }
-  }, [phase, tick]);
-
-  function start() {
-    setPhase("station");
-    setTime(0);
-    setStIdx(0);
-    setRound(1);
-    if (onStation) onStation(0);
-    snd.go();
-  }
-
-  function pause() {
-    if (timerRef.current) clearInterval(timerRef.current);
-    timerRef.current = null;
-    setPhase(p => p === "station" ? "pausedStation" : p === "rest" ? "pausedRest" : p);
-  }
-
-  function resume() {
-    setPhase(p => p === "pausedStation" ? "station" : p === "pausedRest" ? "rest" : p);
-  }
-
-  function reset() {
-    if (timerRef.current) clearInterval(timerRef.current);
-    timerRef.current = null;
-    setPhase("idle");
-    setTime(0);
-    setStIdx(0);
-    setRound(1);
-    if (onStation) onStation(-1);
-  }
-
-  const remaining = Math.max(0, dur - time);
-  const isRunning = phase === "station" || phase === "rest";
-  const isPaused = phase === "pausedStation" || phase === "pausedRest";
-  const isWork = phase === "station" || phase === "pausedStation";
-  const col = isWork ? BH.shotBlue : BH.shotGold;
-
-  return (
-    <div style={{
-      display: "flex",
-      alignItems: "center",
-      gap: "16px",
-      padding: "8px 16px",
-      background: BH.g100,
-      borderRadius: "8px",
-      minHeight: "70px",
-      fontSize: "14px",
-      fontFamily: "system-ui, -apple-system, sans-serif"
-    }}>
-      {/* Countdown number - big and bold */}
-      <div style={{
-        fontSize: "42px",
-        fontWeight: "bold",
-        color: phase === "idle" ? BH.g400 : col,
-        minWidth: "80px",
-        textAlign: "center",
-        fontVariantNumeric: "tabular-nums"
-      }}>
-        {phase === "idle" ? "—" : phase === "done" ? "✓" : remaining}
-      </div>
-
-      {/* Divider */}
-      <div style={{width: "1px", height: "50px", background: BH.g300}} />
-
-      {/* Phase label and info */}
-      <div style={{flex: 1}}>
-        {phase === "idle" && (
-          <div style={{color: BH.g500, fontSize: "13px"}}>Ready to start</div>
-        )}
-        {phase === "done" && (
-          <div style={{fontWeight: "bold", color: BH.maroon}}>CIRCUIT COMPLETE!</div>
-        )}
-        {(phase === "station" || phase === "pausedStation") && (
-          <>
-            <div style={{fontWeight: "bold", color: BH.shotBlue, marginBottom: "2px"}}>WORK</div>
-            <div style={{fontSize: "12px", color: BH.g500}}>
-              Round {round}/{rounds} • Station {stIdx + 1}/{totalStations}
-            </div>
-          </>
-        )}
-        {(phase === "rest" || phase === "pausedRest") && (
-          <>
-            <div style={{fontWeight: "bold", color: BH.shotGold, marginBottom: "2px"}}>REST</div>
-            <div style={{fontSize: "12px", color: BH.g500}}>
-              Round {round}/{rounds} • Next: Station {(stIdx + 1) % totalStations + 1}
-            </div>
-          </>
-        )}
-      </div>
-
-      {/* Control buttons */}
-      <div style={{display: "flex", gap: "8px"}}>
-        {phase === "idle" && (
-          <button onClick={start} style={{
-            padding: "8px 16px",
-            background: BH.shotBlue,
-            color: BH.white,
-            border: "none",
-            borderRadius: "4px",
-            cursor: "pointer",
-            fontSize: "13px",
-            fontWeight: "bold",
-            whiteSpace: "nowrap"
-          }}>
-            START
-          </button>
-        )}
-        {isRunning && (
-          <button onClick={pause} style={{
-            padding: "8px 14px",
-            background: BH.shotGold,
-            color: BH.navy,
-            border: "none",
-            borderRadius: "4px",
-            cursor: "pointer",
-            fontSize: "13px",
-            fontWeight: "bold",
-            whiteSpace: "nowrap"
-          }}>
-            PAUSE
-          </button>
-        )}
-        {isPaused && (
-          <button onClick={resume} style={{
-            padding: "8px 14px",
-            background: BH.shotBlue,
-            color: BH.white,
-            border: "none",
-            borderRadius: "4px",
-            cursor: "pointer",
-            fontSize: "13px",
-            fontWeight: "bold",
-            whiteSpace: "nowrap"
-          }}>
-            RESUME
-          </button>
-        )}
-        {(isRunning || isPaused || phase === "done") && (
-          <button onClick={reset} style={{
-            padding: "8px 14px",
-            background: BH.g400,
-            color: BH.white,
-            border: "none",
-            borderRadius: "4px",
-            cursor: "pointer",
-            fontSize: "13px",
-            fontWeight: "bold",
-            whiteSpace: "nowrap"
-          }}>
-            RESET
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-  </script>
-  <script type="text/babel">
-// DrillViewer Component
-function DrillViewer({drill}) {
-  const [step, setStep] = React.useState(-1);
-  const [playing, setPlaying] = React.useState(false);
-  const [showAll, setShowAll] = React.useState(false);
-  const tmr = React.useRef(null);
-
-  // Reset when drill changes
-  React.useEffect(() => {
-    setStep(-1);
-    setPlaying(false);
-    setShowAll(false);
-  }, [drill && drill.id]);
-
-  // Auto-play timer
-  React.useEffect(() => {
-    if (!playing || !drill) return;
-    tmr.current = setInterval(() => {
-      setStep(s => {
-        if (s >= drill.steps.length - 1) {
-          setPlaying(false);
-          return s;
-        }
-        return s + 1;
-      });
-    }, 1200);
-    return () => clearInterval(tmr.current);
-  }, [playing, drill]);
-
-  if (!drill) return null;
-  const steps = drill.steps || [];
-  const maxStep = steps.length - 1;
-
-  // Button style helper
-  const btn = (bg, small) => ({
-    padding: small ? "6px 10px" : "8px 14px",
-    background: bg,
-    color: BH.white,
-    border: "none",
-    borderRadius: "6px",
-    cursor: "pointer",
-    fontSize: small ? "12px" : "13px",
-    fontWeight: "bold",
-    flex: small ? undefined : 1,
-  });
-
-  return (
-    <div style={{display:"flex", flexDirection:"column", gap:"12px"}}>
-      {/* Court visualization */}
-      <Court
-        courtType={drill.courtType}
-        players={drill.players}
-        steps={steps}
-        activeStep={step}
-        showAll={showAll}
-      />
-
-      {/* Step counter */}
-      <div style={{textAlign:"center", fontSize:"13px", color:BH.g700, fontWeight:"bold"}}>
-        Step {Math.max(0, step) + 1} / {steps.length}
-        {showAll && <span style={{color:BH.maroon, marginLeft:"8px"}}>(All visible)</span>}
-      </div>
-
-      {/* Playback controls */}
-      <div style={{display:"flex", gap:"6px", flexWrap:"wrap", justifyContent:"center"}}>
-        <button onClick={() => { setStep(-1); setPlaying(false); setShowAll(false); }} style={btn(BH.g500)}>
-          Reset
-        </button>
-        <button onClick={() => setStep(s => Math.max(-1, s - 1))} style={btn(BH.navy)}
-                disabled={step <= -1}>
-          ← Back
-        </button>
-        <button onClick={() => {
-          if (playing) { setPlaying(false); }
-          else { if (step >= maxStep) setStep(-1); setPlaying(true); }
-        }} style={btn(playing ? BH.shotRed : BH.shotBlue)}>
-          {playing ? "⏸ Pause" : "▶ Play"}
-        </button>
-        <button onClick={() => setStep(s => Math.min(maxStep, s + 1))} style={btn(BH.navy)}
-                disabled={step >= maxStep}>
-          Next →
-        </button>
-        <button onClick={() => { setShowAll(!showAll); setStep(maxStep); }} style={btn(BH.maroon)}>
-          {showAll ? "Step View" : "Show All"}
-        </button>
-      </div>
-
-      {/* Step-by-step breakdown */}
-      <div style={{background:BH.white, padding:"12px 16px", borderRadius:"8px", border:`1px solid ${BH.g300}`}}>
-        <div style={{fontSize:"12px", fontWeight:"bold", color:BH.navy, marginBottom:"8px"}}>
-          Step Breakdown
-        </div>
-        {steps.map((s, i) => {
-          const isActive = i === step;
-          const isPast = i < step;
-          const desc = s.t === "hit"
-            ? `${s.hitter} hits ${(s.shot||"").replace(/_/g," ")}${s.note ? " — "+s.note : ""}`
-            : `Player moves${s.note ? " — "+s.note : " to position"}`;
-          return (
-            <div key={i} style={{
-              padding:"6px 10px", marginBottom:"2px", borderRadius:"4px", fontSize:"12px",
-              display:"flex", gap:"8px", alignItems:"center",
-              background: isActive ? BH.maroon : "transparent",
-              color: isActive ? BH.white : isPast ? BH.g400 : BH.g700,
-              fontWeight: isActive ? "bold" : "normal",
-              transition: "all 0.2s"
-            }}>
-              <span style={{minWidth:"20px", fontWeight:"bold", color: isActive ? BH.white : BH.g400}}>
-                {s.t === "hit" ? s.n : "·"}
-              </span>
-              <span>{desc}</span>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Coaching tips */}
-      {drill.tips && drill.tips.length > 0 && (
-        <div style={{background:BH.white, padding:"14px 16px", borderRadius:"8px", border:`1px solid ${BH.g300}`}}>
-          <div style={{fontSize:"12px", fontWeight:"bold", color:BH.navy, marginBottom:"6px"}}>
-            Coaching Tips
-          </div>
-          <ul style={{margin:0, paddingLeft:"18px", fontSize:"12px", color:BH.g700, lineHeight:"1.7"}}>
-            {drill.tips.map((t, i) => <li key={i}>{t}</li>)}
-          </ul>
-        </div>
-      )}
-
-      {/* YouTube embed with timestamp support */}
-      {drill.youtubeId && (
-        <div style={{borderRadius:"8px", overflow:"hidden", border:`1px solid ${BH.g300}`}}>
-          <div style={{padding:"8px 12px", background:BH.navy, display:"flex", alignItems:"center", gap:"8px"}}>
-            <span style={{fontSize:"12px", fontWeight:"bold", color:BH.white}}>Video Demo</span>
-            {(drill.youtubeStart || drill.youtubeEnd) && (
-              <span style={{fontSize:"10px", color:BH.maroon, opacity:0.8}}>
-                {drill.youtubeStart ? `from ${Math.floor(drill.youtubeStart/60)}:${String(drill.youtubeStart%60).padStart(2,"0")}` : ""}
-                {drill.youtubeEnd ? ` to ${Math.floor(drill.youtubeEnd/60)}:${String(drill.youtubeEnd%60).padStart(2,"0")}` : ""}
-              </span>
-            )}
-          </div>
-          <div style={{position:"relative", paddingBottom:"56.25%", height:0, overflow:"hidden"}}>
-            <iframe
-              src={`https://www.youtube.com/embed/${drill.youtubeId}?${drill.youtubeStart ? "start="+drill.youtubeStart : ""}${drill.youtubeEnd ? "&end="+drill.youtubeEnd : ""}&rel=0&modestbranding=1`}
-              frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope"
-              allowFullScreen style={{position:"absolute", top:0, left:0, width:"100%", height:"100%"}}/>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// DrillTimer Component
-function DrillTimer({duration, resetKey, onNext, canNext}) {
-  const [running, setRunning] = React.useState(false);
-  const [timeLeft, setTimeLeft] = React.useState(duration);
-  const tmr = React.useRef(null);
-
-  React.useEffect(() => {
-    setRunning(false);
-    setTimeLeft(duration);
-    if (tmr.current) clearInterval(tmr.current);
-    tmr.current = null;
-  }, [duration, resetKey]);
-
-  React.useEffect(() => {
-    if (!running) {
-      if (tmr.current) clearInterval(tmr.current);
-      tmr.current = null;
-      return;
-    }
-    tmr.current = setInterval(() => {
-      setTimeLeft(t => {
-        if (t <= 1) {
-          setRunning(false);
-          if (tmr.current) clearInterval(tmr.current);
-          tmr.current = null;
-          try { snd.done(); } catch(e) {}
-          return 0;
-        }
-        return t - 1;
-      });
-    }, 1000);
-    return () => { if (tmr.current) clearInterval(tmr.current); };
-  }, [running]);
-
-  const mm = String(Math.floor(timeLeft / 60)).padStart(2, "0");
-  const ss = String(timeLeft % 60).padStart(2, "0");
-
-  const btn = (bg) => ({
-    padding:"8px 12px",
-    background:bg,
-    color:BH.white,
-    border:"none",
-    borderRadius:"6px",
-    cursor:"pointer",
-    fontSize:"12px",
-    fontWeight:"bold"
-  });
-
-  return (
-    <div style={{background:BH.white, border:`1px solid ${BH.g300}`, borderRadius:"8px", padding:"12px 14px", marginBottom:"10px"}}>
-      <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"8px", gap:"8px"}}>
-        <div style={{fontSize:"12px", fontWeight:"bold", color:BH.navy}}>Drill Timer</div>
-        <div style={{fontSize:"18px", fontWeight:"bold", color:BH.maroon}}>{mm}:{ss}</div>
-      </div>
-      <div style={{display:"flex", gap:"8px", flexWrap:"wrap"}}>
-        <button onClick={() => setRunning(r => !r)} style={btn(running ? BH.shotRed : BH.shotBlue)}>
-          {running ? "Pause" : "Start"}
-        </button>
-        <button onClick={() => setTimeLeft(duration)} style={btn(BH.g500)}>Reset</button>
-        <button onClick={() => setTimeLeft(t => t + 30)} style={btn(BH.navy)}>+30s</button>
-        <button onClick={onNext} disabled={!canNext} style={{
-          ...btn(canNext ? BH.maroon : BH.g300),
-          cursor: canNext ? "pointer" : "not-allowed"
-        }}>Next Drill</button>
-      </div>
-    </div>
-  );
-}
-
-// LoginModal Component
-function LoginModal({onLogin, onClose}) {
-  const [un, setUn] = React.useState("");
-  const [pw, setPw] = React.useState("");
-  const [err, setErr] = React.useState("");
-
-  const handleLogin = async () => {
-    if (!un.trim() || !pw.trim()) { setErr("Enter username and password"); return; }
-    const pwh = await sha256(pw);
-    if (un === "BHTennis" && pwh === "b58f004c95d0a0c859256c96ac33f70e5ccc9cadaf17997425f883bbcbb6cfdd") {
-      setErr("");
-      onLogin();
-    } else {
-      setErr("Invalid credentials");
-    }
-  };
-
-  return (
-    <div style={{position:"fixed", top:0, left:0, right:0, bottom:0, background:"rgba(0,0,0,0.5)",
-                 display:"flex", alignItems:"center", justifyContent:"center", zIndex:1000}}>
-      <div style={{background:BH.white, padding:"32px", borderRadius:"12px", width:"100%", maxWidth:"340px",
-                   boxShadow:"0 10px 40px rgba(0,0,0,0.2)"}}>
-        <div style={{textAlign:"center", marginBottom:"20px"}}>
-          <div style={{fontSize:"20px", fontWeight:"bold", color:BH.navy}}>Admin Login</div>
-          <div style={{fontSize:"12px", color:BH.g500, marginTop:"4px"}}>Belmont Hill Tennis</div>
-        </div>
-        <input type="text" placeholder="Username" value={un} onChange={e => setUn(e.target.value)}
-          style={{width:"100%", padding:"10px 12px", marginBottom:"12px", border:`1px solid ${BH.g300}`,
-                  borderRadius:"6px", fontSize:"14px", boxSizing:"border-box"}}
-          onKeyDown={e => e.key === "Enter" && handleLogin()}/>
-        <input type="password" placeholder="Password" value={pw} onChange={e => setPw(e.target.value)}
-          style={{width:"100%", padding:"10px 12px", marginBottom:"12px", border:`1px solid ${BH.g300}`,
-                  borderRadius:"6px", fontSize:"14px", boxSizing:"border-box"}}
-          onKeyDown={e => e.key === "Enter" && handleLogin()}/>
-        {err && <div style={{color:BH.shotRed, fontSize:"12px", marginBottom:"12px", textAlign:"center"}}>{err}</div>}
-        <div style={{display:"flex", gap:"8px"}}>
-          <button onClick={handleLogin} style={{flex:1, padding:"10px", background:BH.navy, color:BH.white,
-            border:"none", borderRadius:"6px", cursor:"pointer", fontWeight:"bold", fontSize:"14px"}}>Login</button>
-          <button onClick={onClose} style={{flex:1, padding:"10px", background:BH.g300, color:BH.navy,
-            border:"none", borderRadius:"6px", cursor:"pointer", fontSize:"14px"}}>Cancel</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// App Component
-function App() {
-  const SUPABASE_URL = "https://uievqtckkotplvyfqshu.supabase.co";
-  const SUPABASE_ANON_KEY = "sb_publishable_8YcUvmNO3QWfFqOnqMKcdg_y_-L2QRg";
-  const sbRest = async (path, opts = {}) => {
-    const headers = Object.assign({
-      apikey: SUPABASE_ANON_KEY,
-      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-      "Content-Type": "application/json",
-      Accept: "application/json"
-    }, opts.headers || {});
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, Object.assign({}, opts, { headers }));
-    return res;
-  };
-
-  const [tab, setTab] = React.useState("circuits");
-  const [admin, setAdmin] = React.useState(false);
-  const [showLogin, setShowLogin] = React.useState(false);
-  const [drillTime, setDrillTime] = React.useState(90);
-  const [isMobile, setIsMobile] = React.useState(window.innerWidth < 900);
-  const [isSmall, setIsSmall] = React.useState(window.innerWidth < 768);
-
-  // Published plan state
-  const [pubDrills, setPubDrills] = React.useState([]);
-  const [pubExercises, setPubExercises] = React.useState([]);
-  const [work, setWork] = React.useState(45);
-  const [rest, setRest] = React.useState(15);
-  const [rounds, setRounds] = React.useState(3);
-
-  // Admin selection state
-  const [selDrills, setSelDrills] = React.useState([]);
-  const [selExercises, setSelExercises] = React.useState([]);
-
-  // UI state
-  const [drSkill, setDrSkill] = React.useState("All");
-  const [exCat, setExCat] = React.useState("All");
-  const [viewDrill, setViewDrill] = React.useState(null);
-  const [toast, setToast] = React.useState("");
-  const [circuitStIdx, setCircuitStIdx] = React.useState(-1);
-
-  // Load config on mount
-  React.useEffect(() => {
-    let cfg = null;
-    const h = window.location.hash.substring(1);
-    if (h.startsWith("config=")) {
-      try { cfg = JSON.parse(atob(h.slice(7))); } catch(e) {}
-    }
-    const normalizeDrills = (drills, defaultTime) => {
-      if (!Array.isArray(drills)) return [];
-      if (drills.length === 0) return [];
-      if (typeof drills[0] === "string") {
-        return drills.map(id => ({ id, time: defaultTime || 90 }));
-      }
-      return drills.map(d => ({
-        id: d.id,
-        time: typeof d.time === "number" ? d.time : (defaultTime || 90)
-      }));
-    };
-    const applyCfg = (c) => {
-      if (!c) return;
-      const defaultTime = c.drillTime || 90;
-      const normDrills = normalizeDrills(c.drills || [], defaultTime);
-      setPubDrills(normDrills);
-      setPubExercises(c.exercises || []);
-      setSelDrills(normDrills);
-      setSelExercises(c.exercises || []);
-      setWork(c.work || 45);
-      setRest(c.rest || 15);
-      setRounds(c.rounds || 3);
-      setDrillTime(defaultTime);
-    };
-    const loadFromSupabase = async () => {
-      const res = await sbRest("published_plan?select=data&id=eq.1", { method: "GET" });
-      if (!res.ok) return null;
-      const rows = await res.json();
-      if (!rows || !rows[0] || !rows[0].data) return null;
-      return rows[0].data;
-    };
-    if (cfg) {
-      applyCfg(cfg);
-    } else {
-      (async () => {
-        const sbCfg = await loadFromSupabase();
-        if (sbCfg) {
-          applyCfg(sbCfg);
-        } else {
-          const lc = localStorage.getItem("bh-tennis-published");
-          if (lc) {
-            try { applyCfg(JSON.parse(lc)); } catch(e) {}
-          }
-        }
-      })();
-    }
-    if (sessionStorage.getItem("bh-admin")) setAdmin(true);
-  }, []);
-
-  // Track viewport for responsive layout
-  React.useEffect(() => {
-    const onResize = () => {
-      setIsMobile(window.innerWidth < 900);
-      setIsSmall(window.innerWidth < 768);
-    };
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
-
-  // Login/logout handlers
-  const handleLogin = () => { setShowLogin(false); setAdmin(true); sessionStorage.setItem("bh-admin","1"); };
-  const handleLogout = () => { setAdmin(false); sessionStorage.removeItem("bh-admin"); };
-
-  // Publish handler
-  const handlePublish = () => {
-    const cfg = { drills: selDrills, exercises: selExercises, work, rest, rounds, drillTime };
-    const doLocalPublish = () => {
-      localStorage.setItem("bh-tennis-published", JSON.stringify(cfg));
-      setPubDrills(selDrills);
-      setPubExercises(selExercises);
-      const url = window.location.origin + window.location.pathname + "#config=" + btoa(JSON.stringify(cfg));
-      navigator.clipboard.writeText(url).then(() => {
-        setToast("Plan published! Link copied to clipboard.");
-        setTimeout(() => setToast(""), 3000);
-      });
-    };
-    sbRest("published_plan", {
-      method: "POST",
-      headers: { Prefer: "resolution=merge-duplicates" },
-      body: JSON.stringify({ id: 1, data: cfg })
-    }).then(async (res) => {
-      if (!res.ok) {
-        doLocalPublish();
-        setToast("Published locally. Supabase write failed.");
-        setTimeout(() => setToast(""), 4000);
-        return;
-      }
-      setPubDrills(selDrills);
-      setPubExercises(selExercises);
-      setToast("Plan published for everyone!");
-      setTimeout(() => setToast(""), 3000);
-    });
-  };
-
-  // Toggle drill selection (admin)
-  const toggleDrill = (id) => {
-    setSelDrills(sel => {
-      const exists = sel.find(d => d.id === id);
-      if (exists) return sel.filter(d => d.id !== id);
-      return [...sel, { id, time: drillTime }];
-    });
-  };
-
-  // Toggle exercise selection (admin)
-  const toggleExercise = (id) => {
-    setSelExercises(sel => sel.includes(id) ? sel.filter(x => x !== id) : [...sel, id]);
-  };
-
-  // Filtered lists for admin category browsing
-  const filteredDrills = DRILLS.filter(d =>
-    (drSkill === "All" || d.skill === drSkill)
-  );
-  const filteredExercises = exCat === "All" ? EXERCISES : EXERCISES.filter(e => e.cat === exCat);
-
-  // The drill list that non-admin players see (only published drills, in order)
-  const playerDrills = pubDrills.map(d => {
-    const drill = DRILLS.find(x => x.id === d.id);
-    return drill ? { drill, time: d.time } : null;
-  }).filter(Boolean);
-
-  // The exercise list for non-admin
-  const playerExercises = pubExercises.map(id => EXERCISES.find(e => e.id === id)).filter(Boolean);
-
-  // Current drill for viewer
-  const currentViewDrill = viewDrill ? DRILLS.find(d => d.id === viewDrill) : null;
-
-  // Practice mode drill
-  const orderedDrillIds = admin ? selDrills.map(d => d.id) : pubDrills.map(d => d.id);
-  const currentDrillTime = admin
-    ? (selDrills.find(d => d.id === viewDrill) || {}).time
-    : (pubDrills.find(d => d.id === viewDrill) || {}).time;
-  const currentDrillTimeSafe = typeof currentDrillTime === "number" ? currentDrillTime : drillTime;
-  const currentDrillIdx = viewDrill ? orderedDrillIds.indexOf(viewDrill) : -1;
-  const canNextDrill = currentDrillIdx >= 0 && currentDrillIdx < orderedDrillIds.length - 1;
-  const goNextDrill = () => {
-    if (!canNextDrill) return;
-    setViewDrill(orderedDrillIds[currentDrillIdx + 1]);
-  };
-
-  // Admin's selected exercises for circuit
-  const adminExercises = selExercises.map(id => EXERCISES.find(e => e.id === id)).filter(Boolean);
-
-  // Circuit exercises to display
-  const circuitExercises = admin ? adminExercises : playerExercises;
-
-  // Auto-select first drill when view drill is null
-  React.useEffect(() => {
-    if (!viewDrill) {
-      if (admin && selDrills.length > 0) setViewDrill(selDrills[0]);
-      else if (!admin && playerDrills.length > 0) setViewDrill(playerDrills[0].id);
-    }
-  }, [admin, selDrills, playerDrills.length]);
-
-  // --- RENDER ---
-
-  // Button style helpers
-  const tabBtn = (active) => ({
-    padding:"10px 24px", background:active?BH.navy:BH.g200, color:active?BH.white:BH.navy,
-    border:"none", borderRadius:"6px", cursor:"pointer", fontWeight:"bold", fontSize:"14px"
-  });
-
-  const catBtn = (active) => ({
-    padding:"6px 12px", background:active?BH.navy:BH.g100, color:active?BH.white:BH.navy,
-    border:`1px solid ${active?BH.navy:BH.g300}`, borderRadius:"4px", cursor:"pointer", fontSize:"12px"
-  });
-
-  return (
-    <div style={{minHeight:"100vh", background:BH.offWhite}}>
-      {/* Header */}
-      <header style={{background:BH.navy, color:BH.white, padding:"16px 24px", display:"flex",
-                      justifyContent:"space-between", alignItems:"center",
-                      boxShadow:"0 2px 8px rgba(0,0,0,0.15)"}}>
-        <div>
-          <div style={{fontSize:"20px", fontWeight:"normal", color:BH.white, letterSpacing:"3.5px",
-                      fontFamily:"Georgia, 'Times New Roman', serif"}}>BELMONT HILL</div>
-          <div style={{fontSize:"12px", opacity:0.85, letterSpacing:"1px"}}>Varsity Tennis</div>
-        </div>
-        <div style={{display:"flex", gap:"12px", alignItems:"center"}}>
-          {admin ? (
-            <>
-              <span style={{fontSize:"11px", background:BH.maroon, color:BH.white, padding:"4px 10px",
-                            borderRadius:"4px", fontWeight:"bold"}}>ADMIN</span>
-              <button onClick={handlePublish} style={{padding:"8px 14px", background:BH.maroon, color:BH.white,
-                border:"none", borderRadius:"6px", cursor:"pointer", fontSize:"12px", fontWeight:"bold"}}>
-                Publish Plan
-              </button>
-              <button onClick={handleLogout} style={{padding:"8px 14px", background:"rgba(255,255,255,0.15)",
-                color:BH.white, border:"none", borderRadius:"6px", cursor:"pointer", fontSize:"12px"}}>
-                Logout
-              </button>
-            </>
-          ) : (
-            <button onClick={() => setShowLogin(true)} style={{fontSize:"16px", background:"none",
-              border:"none", cursor:"pointer", color:BH.white, opacity:0.6, padding:"4px"}}>
-              🔒
-            </button>
-          )}
-        </div>
-      </header>
-
-      {/* Tab bar */}
-      <div style={{display:"flex", justifyContent:"center", gap:"12px", padding:"16px",
-                   background:BH.white, borderBottom:`1px solid ${BH.g300}`}}>
-        <button onClick={() => { setTab("circuits"); }} style={tabBtn(tab==="circuits")}>
-          Circuits
-        </button>
-        <button onClick={() => { setTab("drills"); }} style={tabBtn(tab==="drills")}>
-          Drills
-        </button>
-      </div>
-
-      {/* Login modal */}
-      {showLogin && <LoginModal onLogin={handleLogin} onClose={() => setShowLogin(false)}/>}
-
-      {/* Toast */}
-      {toast && (
-        <div style={{position:"fixed", bottom:"20px", right:"20px", background:BH.navy, color:BH.white,
-                     padding:"12px 20px", borderRadius:"8px", zIndex:500, fontSize:"13px",
-                     boxShadow:"0 4px 12px rgba(0,0,0,0.2)"}}>{toast}</div>
-      )}
-
-      {/* Main content */}
-      <div style={{maxWidth:"1200px", margin:"0 auto", padding:"20px"}}>
-
-        {/* ===== DRILLS TAB ===== */}
-        {tab === "drills" && (
-          (
-            /* Drills View */
-            <div style={{display:"flex", gap:"20px", flexDirection:isMobile ? "column" : "row"}}>
-              {/* Left sidebar */}
-              <div style={{width:isMobile ? "100%" : "300px", flexShrink:0}}>
-
-                {admin ? (
-                  /* Admin: category filter + drill list with checkboxes + today's plan summary */
-                  <>
-                    {/* Skill filter */}
-                    <div style={{display:"flex", flexWrap:"wrap", gap:"6px", marginBottom:"16px"}}>
-                      {DRILL_SKILLS.map(s => (
-                        <button key={s} onClick={() => setDrSkill(s)} style={catBtn(drSkill===s)}>{s}</button>
-                      ))}
-                    </div>
-
-                    {/* Drill list with checkboxes */}
-                    <div style={{background:BH.white, borderRadius:"8px", border:`1px solid ${BH.g300}`,
-                                 maxHeight:isSmall ? "260px" : "350px", overflowY:"auto"}}>
-                      <div style={{padding:"12px 14px", borderBottom:`1px solid ${BH.g200}`,
-                                   fontSize:"13px", fontWeight:"bold", color:BH.navy}}>
-                        All Drills
-                      </div>
-                      {filteredDrills.map(d => (
-                        <div key={d.id} style={{padding:isSmall ? "10px 14px" : "8px 14px", display:"flex", gap:"8px", alignItems:"center",
-                          cursor:"pointer", borderBottom:`1px solid ${BH.g100}`,
-                          background:viewDrill===d.id ? `rgba(59,130,246,0.08)` : "transparent"}}
-                          onClick={() => setViewDrill(d.id)}>
-                          <input type="checkbox" checked={selDrills.some(x => x.id === d.id)}
-                            onChange={(e) => { e.stopPropagation(); toggleDrill(d.id); }}
-                            style={{cursor:"pointer", accentColor:BH.navy, transform:isSmall ? "scale(1.1)" : "none"}}/>
-                          <div style={{flex:1}}>
-                            <div style={{fontSize:isSmall ? "13px" : "12px", fontWeight:"bold", color:BH.navy}}>{d.name}</div>
-                            <div style={{fontSize:isSmall ? "11px" : "10px", color:BH.g500}}>{d.skill || d.cat} • {d.diff}</div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Today's Plan summary */}
-                    <div style={{background:BH.white, borderRadius:"8px", border:`2px solid ${BH.maroon}`,
-                                 marginTop:"16px", overflow:"hidden"}}>
-                      <div style={{padding:"10px 14px", background:BH.maroon, color:BH.white,
-                                   fontSize:"13px", fontWeight:"bold"}}>
-                        Today's Plan ({selDrills.length} drills)
-                      </div>
-                      <div style={{padding:"8px 14px", maxHeight:isSmall ? "180px" : "200px", overflowY:"auto"}}>
-                        {selDrills.length === 0 ? (
-                          <div style={{fontSize:"12px", color:BH.g500, padding:"8px 0"}}>
-                            Check drills above to build today's plan
-                          </div>
-                        ) : (
-                          selDrills.map((entry, i) => {
-                            const d = DRILLS.find(dr => dr.id === entry.id);
-                            if (!d) return null;
-                            return (
-                              <div key={entry.id} style={{display:"flex", gap:"8px", alignItems:"center", padding:isSmall ? "6px 0" : "4px 0",
-                                borderBottom:i < selDrills.length-1 ? `1px solid ${BH.g100}` : "none"}}>
-                                <span style={{fontSize:"11px", fontWeight:"bold", color:BH.maroon, minWidth:"18px"}}>{i+1}.</span>
-                                <div style={{display:"flex", flexDirection:"column", gap:"2px"}}>
-                                  <span style={{fontSize:isSmall ? "13px" : "12px", color:BH.navy}}>{d.name}</span>
-                                  <div style={{display:"flex", alignItems:"center", gap:"6px"}}>
-                                    <span style={{fontSize:"10px", color:BH.g500}}>Time (sec)</span>
-                                    <input type="number" value={entry.time}
-                                      onChange={(e) => {
-                                        const v = Math.max(10, Math.min(900, +e.target.value || 0));
-                                        setSelDrills(sel => sel.map(x => x.id === entry.id ? { ...x, time: v } : x));
-                                      }}
-                                      style={{width:isSmall ? "72px" : "64px", padding:"4px 6px", border:`1px solid ${BH.g300}`, borderRadius:"4px", fontSize:"12px"}}/>
-                                  </div>
-                                </div>
-                                <button onClick={() => toggleDrill(entry.id)} style={{marginLeft:"auto", background:"none",
-                                  border:"none", cursor:"pointer", fontSize:"14px", color:BH.g400, padding:"0 2px"}}>×</button>
-                              </div>
-                            );
-                          })
-                        )}
-                      </div>
-                    </div>
-
-                  </>
-                ) : (
-                  /* Non-Admin: Today's Plan (read-only numbered list) */
-                  <div style={{background:BH.white, borderRadius:"8px", border:`2px solid ${BH.maroon}`, overflow:"hidden"}}>
-                    <div style={{padding:"12px 16px", background:BH.maroon, color:BH.white}}>
-                      <div style={{fontSize:"15px", fontWeight:"bold"}}>Today's Plan</div>
-                      <div style={{fontSize:"11px", opacity:0.8}}>{playerDrills.length} drills</div>
-                    </div>
-                    <div style={{padding:"8px 0"}}>
-                    {playerDrills.length === 0 ? (
-                      <div style={{padding:"20px 16px", textAlign:"center", fontSize:"13px", color:BH.g500}}>
-                        No drills published yet. Check back later!
-                      </div>
-                    ) : (
-                        playerDrills.map((item, i) => (
-                          <div key={item.drill.id} onClick={() => setViewDrill(item.drill.id)}
-                            style={{padding:"10px 16px", display:"flex", gap:"10px", alignItems:"center",
-                              cursor:"pointer", borderBottom:`1px solid ${BH.g100}`,
-                              background:viewDrill===item.drill.id ? `rgba(201,162,39,0.12)` : "transparent"}}>
-                            <span style={{fontSize:"14px", fontWeight:"bold", color:BH.maroon, minWidth:"24px"}}>{i+1}</span>
-                            <div>
-                              <div style={{fontSize:"13px", fontWeight:"bold", color:BH.navy}}>{item.drill.name}</div>
-                              <div style={{fontSize:"11px", color:BH.g500}}>{item.drill.desc}</div>
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Right: Drill Viewer */}
-              <div style={{flex:1, minWidth:0, position:"relative"}}>
-                {viewDrill && (
-                  <div style={{
-                    position: isMobile ? "relative" : "absolute",
-                    top: isMobile ? "auto" : 0,
-                    right: isMobile ? "auto" : 0,
-                    zIndex:5,
-                    width: isMobile ? "100%" : "260px",
-                    marginBottom: isMobile ? "12px" : 0
-                  }}>
-                    <DrillTimer
-                      duration={currentDrillTimeSafe}
-                      resetKey={viewDrill}
-                      onNext={goNextDrill}
-                      canNext={canNextDrill}
-                    />
-                  </div>
-                )}
-                {currentViewDrill ? (
-                  <DrillViewer drill={currentViewDrill}/>
-                ) : (
-                  <div style={{textAlign:"center", padding:"60px 20px", color:BH.g500}}>
-                    {admin ? "Select a drill to preview" : "Select a drill from today's plan"}
-                  </div>
-                )}
-              </div>
-            </div>
-          )
-        )}
-
-        {/* ===== CIRCUITS TAB ===== */}
-        {tab === "circuits" && (
-          <div style={{display:"flex", gap:"20px", flexDirection:isMobile ? "column" : "row"}}>
-            {/* Left sidebar */}
-            <div style={{width:isMobile ? "100%" : "300px", flexShrink:0}}>
-              {admin ? (
-                /* Admin: category filter + exercise list + settings */
-                <>
-                  <div style={{display:"flex", flexWrap:"wrap", gap:"6px", marginBottom:"16px"}}>
-                    {EX_CATS.map(c => (
-                      <button key={c} onClick={() => setExCat(c)} style={catBtn(exCat===c)}>{c}</button>
-                    ))}
-                  </div>
-
-                  <div style={{background:BH.white, borderRadius:"8px", border:`1px solid ${BH.g300}`,
-                               maxHeight:isSmall ? "260px" : "350px", overflowY:"auto"}}>
-                    <div style={{padding:"12px 14px", borderBottom:`1px solid ${BH.g200}`,
-                                 fontSize:"13px", fontWeight:"bold", color:BH.navy}}>
-                      Exercises
-                    </div>
-                    {filteredExercises.map(e => (
-                      <div key={e.id} style={{padding:isSmall ? "10px 14px" : "8px 14px", display:"flex", gap:"8px", alignItems:"center",
-                        cursor:"pointer", borderBottom:`1px solid ${BH.g100}`}}
-                        onClick={() => toggleExercise(e.id)}>
-                        <input type="checkbox" checked={selExercises.includes(e.id)}
-                          onChange={() => {}} style={{cursor:"pointer", accentColor:BH.navy, transform:isSmall ? "scale(1.1)" : "none"}}/>
-                        <div style={{flex:1}}>
-                          <div style={{fontSize:isSmall ? "13px" : "12px", fontWeight:"bold", color:BH.navy}}>{e.name}</div>
-                          <div style={{fontSize:isSmall ? "11px" : "10px", color:BH.g500}}>{e.cat} • {e.reps}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Timer settings */}
-                  <div style={{background:BH.white, borderRadius:"8px", border:`1px solid ${BH.g300}`,
-                               marginTop:"16px", padding:"14px"}}>
-                    <div style={{fontSize:"13px", fontWeight:"bold", color:BH.navy, marginBottom:"10px"}}>
-                      Timer Settings
-                    </div>
-                    <div style={{display:"flex", flexDirection:"column", gap:"8px"}}>
-                      <label style={{fontSize:"12px", color:BH.g700, display:"flex", justifyContent:"space-between", alignItems:"center"}}>
-                        Work (sec)
-                        <input type="number" value={work} onChange={e => setWork(+e.target.value)}
-                          style={{width:"60px", padding:"4px 8px", border:`1px solid ${BH.g300}`, borderRadius:"4px"}} min="10" max="120"/>
-                      </label>
-                      <label style={{fontSize:"12px", color:BH.g700, display:"flex", justifyContent:"space-between", alignItems:"center"}}>
-                        Rest (sec)
-                        <input type="number" value={rest} onChange={e => setRest(+e.target.value)}
-                          style={{width:"60px", padding:"4px 8px", border:`1px solid ${BH.g300}`, borderRadius:"4px"}} min="5" max="60"/>
-                      </label>
-                      <label style={{fontSize:"12px", color:BH.g700, display:"flex", justifyContent:"space-between", alignItems:"center"}}>
-                        Rounds
-                        <input type="number" value={rounds} onChange={e => setRounds(+e.target.value)}
-                          style={{width:"60px", padding:"4px 8px", border:`1px solid ${BH.g300}`, borderRadius:"4px"}} min="1" max="10"/>
-                      </label>
-                    </div>
-                  </div>
-
-                  {/* Selected exercises summary */}
-                  <div style={{background:BH.white, borderRadius:"8px", border:`2px solid ${BH.maroon}`,
-                               marginTop:"16px", overflow:"hidden"}}>
-                    <div style={{padding:"10px 14px", background:BH.maroon, color:BH.white,
-                                 fontSize:"13px", fontWeight:"bold"}}>
-                      Today's Circuit ({selExercises.length} exercises)
-                    </div>
-                    <div style={{padding:"8px 14px", maxHeight:"150px", overflowY:"auto"}}>
-                      {selExercises.length === 0 ? (
-                        <div style={{fontSize:"12px", color:BH.g500, padding:"8px 0"}}>
-                          Check exercises above to build circuit
-                        </div>
-                      ) : (
-                        selExercises.map((id, i) => {
-                          const e = EXERCISES.find(ex => ex.id === id);
-                          if (!e) return null;
-                          return (
-                            <div key={id} style={{display:"flex", gap:"8px", alignItems:"center", padding:"3px 0"}}>
-                              <span style={{fontSize:"11px", fontWeight:"bold", color:BH.maroon, minWidth:"18px"}}>{i+1}.</span>
-                              <span style={{fontSize:"12px", color:BH.navy}}>{e.name}</span>
-                              <button onClick={() => toggleExercise(id)} style={{marginLeft:"auto", background:"none",
-                                border:"none", cursor:"pointer", fontSize:"14px", color:BH.g400}}>×</button>
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
-                  </div>
-
-                  {adminExercises.length > 0 && (
-                    <div style={{marginTop:"16px"}}>
-                      <CircuitTimer work={work} rest={rest} rounds={rounds} exercises={adminExercises}
-                        onStation={(i) => setCircuitStIdx(i)}/>
-                    </div>
-                  )}
-                </>
-              ) : (
-                /* Non-Admin: Published circuit (read-only) */
-                <>
-                  <div style={{background:BH.white, borderRadius:"8px", border:`2px solid ${BH.maroon}`, overflow:"hidden"}}>
-                    <div style={{padding:"12px 16px", background:BH.maroon, color:BH.white}}>
-                      <div style={{fontSize:"15px", fontWeight:"bold"}}>Today's Circuit</div>
-                      <div style={{fontSize:"11px", opacity:0.8}}>
-                        {playerExercises.length} exercises • {work}s work / {rest}s rest • {rounds} rounds
-                      </div>
-                    </div>
-                    <div style={{padding:"8px 0"}}>
-                      {playerExercises.length === 0 ? (
-                        <div style={{padding:"20px 16px", textAlign:"center", fontSize:"13px", color:BH.g500}}>
-                          No circuit published yet. Check back later!
-                        </div>
-                      ) : (
-                        playerExercises.map((e, i) => (
-                          <div key={e.id} style={{padding:"8px 16px", display:"flex", gap:"10px", alignItems:"center",
-                            borderBottom:`1px solid ${BH.g100}`,
-                            background:circuitStIdx===i ? `rgba(201,162,39,0.12)` : "transparent"}}>
-                            <span style={{fontSize:"14px", fontWeight:"bold", color:BH.maroon, minWidth:"24px"}}>{i+1}</span>
-                            <div>
-                              <div style={{fontSize:"13px", fontWeight:"bold", color:BH.navy}}>{e.name}</div>
-                              <div style={{fontSize:"11px", color:BH.g500}}>{e.reps} • {e.equip}</div>
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-
-                  {playerExercises.length > 0 && (
-                    <div style={{marginTop:"16px"}}>
-                      <CircuitTimer work={work} rest={rest} rounds={rounds} exercises={playerExercises}
-                        onStation={(i) => setCircuitStIdx(i)}/>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-
-            {/* Right: Circuit Ring + Timer */}
-            <div style={{flex:1, minWidth:0}}>
-              {circuitExercises.length === 0 ? (
-                <div style={{textAlign:"center", padding:"60px 20px", color:BH.g500}}>
-                  {admin ? "Select exercises from the left to build your circuit" : "No circuit published yet."}
-                </div>
-              ) : (
-                <>
-                  <CircuitRing stations={circuitExercises} selectedIdx={circuitStIdx}
-                    onSelect={(i) => setCircuitStIdx(i)}
-                    onRemove={admin ? (i) => {
-                      const id = circuitExercises[i] && circuitExercises[i].id;
-                      if (id) {
-                        setSelExercises(sel => sel.filter(x => x !== id));
-                        if (circuitStIdx === i) setCircuitStIdx(-1);
-                        else if (circuitStIdx > i) setCircuitStIdx(circuitStIdx - 1);
-                      }
-                    } : null}/>
-                  {/* Selected exercise detail card */}
-                  {circuitStIdx >= 0 && circuitStIdx < circuitExercises.length && (
-                    <div style={{background:BH.white, padding:"16px", borderRadius:"8px", border:`2px solid ${BH.maroon}`, marginTop:"16px", textAlign:"center"}}>
-                      <div style={{fontSize:"16px", fontWeight:"bold", color:BH.navy, marginBottom:"4px"}}>
-                        {circuitExercises[circuitStIdx].name}
-                      </div>
-                      <div style={{fontSize:"13px", color:BH.g700, marginBottom:"8px"}}>
-                        {circuitExercises[circuitStIdx].desc}
-                      </div>
-                      <div style={{display:"flex", justifyContent:"center", gap:"16px", fontSize:"12px", color:BH.g500}}>
-                        <span>{circuitExercises[circuitStIdx].reps}</span>
-                        <span>•</span>
-                        <span>{circuitExercises[circuitStIdx].equip}</span>
-                      </div>
-                      {circuitExercises[circuitStIdx].youtubeId && (
-                        <div style={{borderRadius:"8px", overflow:"hidden", border:`1px solid ${BH.g300}`, marginTop:"12px", textAlign:"left"}}>
-                          <div style={{padding:"8px 12px", background:BH.navy, display:"flex", alignItems:"center", gap:"8px"}}>
-                            <span style={{fontSize:"12px", fontWeight:"bold", color:BH.white}}>Video Demo</span>
-                            {(circuitExercises[circuitStIdx].youtubeStart || circuitExercises[circuitStIdx].youtubeEnd) && (
-                              <span style={{fontSize:"10px", color:BH.maroon, opacity:0.8}}>
-                                {circuitExercises[circuitStIdx].youtubeStart ? `from ${Math.floor(circuitExercises[circuitStIdx].youtubeStart/60)}:${String(circuitExercises[circuitStIdx].youtubeStart%60).padStart(2,"0")}` : ""}
-                                {circuitExercises[circuitStIdx].youtubeEnd ? ` to ${Math.floor(circuitExercises[circuitStIdx].youtubeEnd/60)}:${String(circuitExercises[circuitStIdx].youtubeEnd%60).padStart(2,"0")}` : ""}
-                              </span>
-                            )}
                           </div>
                           <div style={{position:"relative", paddingBottom:"56.25%", height:0, overflow:"hidden"}}>
                             <iframe
