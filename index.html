@@ -1605,7 +1605,22 @@ function DrillTimer({duration, resetKey, onNext, canNext, isAdmin}) {
 }
 
 // StretchTimer Component
-function StretchTimer({label, color, session, kind, isAdmin, onAdminStart, onAdminPause, onAdminResume, onAdminReset, list, work, rest}) {
+function StretchTimer({
+  label,
+  color,
+  session,
+  kind,
+  isAdmin,
+  onAdminStart,
+  onAdminPause,
+  onAdminResume,
+  onAdminReset,
+  list,
+  work,
+  rest,
+  onWorkChange,
+  onRestChange
+}) {
   const [tick, setTick] = React.useState(0);
   const tmr = React.useRef(null);
 
@@ -1628,9 +1643,10 @@ function StretchTimer({label, color, session, kind, isAdmin, onAdminStart, onAdm
     return () => { if (tmr.current) clearInterval(tmr.current); };
   }, [session]);
 
-  const safeWork = Math.max(1, work || 0);
-  const safeRest = Math.max(0, rest || 0);
-  const count = Array.isArray(list) ? list.length : 0;
+  const safeWork = Math.max(5, Number(work) || 0);
+  const safeRest = Math.max(0, Number(rest) || 0);
+  const safeList = Array.isArray(list) ? list.filter(Boolean) : [];
+  const count = safeList.length;
   const per = safeWork + safeRest;
   const total = count > 0 ? (count * safeWork + Math.max(0, count - 1) * safeRest) : 0;
   const elapsed = Math.min(getElapsed(), total);
@@ -1653,7 +1669,7 @@ function StretchTimer({label, color, session, kind, isAdmin, onAdminStart, onAdm
         if (cyclePos < safeWork) {
           phase = "stretch";
           timeLeft = safeWork - cyclePos;
-          title = list[idx].name;
+          title = safeList[idx].name;
         } else {
           phase = "done";
           timeLeft = 0;
@@ -1663,7 +1679,7 @@ function StretchTimer({label, color, session, kind, isAdmin, onAdminStart, onAdm
         if (cyclePos < safeWork) {
           phase = "stretch";
           timeLeft = safeWork - cyclePos;
-          title = list[idx].name;
+          title = safeList[idx].name;
         } else {
           phase = "rest";
           timeLeft = safeRest - (cyclePos - safeWork);
@@ -1722,6 +1738,24 @@ function StretchTimer({label, color, session, kind, isAdmin, onAdminStart, onAdm
           opacity: canAdmin ? 1 : 0.6
         }}>Reset</button>
       </div>
+      {isAdmin ? (
+        <div style={{marginTop:"10px", display:"flex", gap:"10px", flexWrap:"wrap"}}>
+          <label style={{fontSize:"11px", color:BH.g700, display:"flex", alignItems:"center", gap:"6px"}}>
+            Stretch (sec)
+            <input type="number" value={work} onChange={onWorkChange}
+              style={{width:"64px", padding:"4px 6px", border:`1px solid ${BH.g300}`, borderRadius:"4px"}} min="5" max="1800"/>
+          </label>
+          <label style={{fontSize:"11px", color:BH.g700, display:"flex", alignItems:"center", gap:"6px"}}>
+            Rest (sec)
+            <input type="number" value={rest} onChange={onRestChange}
+              style={{width:"64px", padding:"4px 6px", border:`1px solid ${BH.g300}`, borderRadius:"4px"}} min="0" max="300"/>
+          </label>
+        </div>
+      ) : (
+        <div style={{marginTop:"8px", fontSize:"11px", color:BH.g600}}>
+          Stretch {safeWork}s • Rest {safeRest}s
+        </div>
+      )}
     </div>
   );
 }
@@ -2177,14 +2211,21 @@ function App() {
     if (!start) return 0;
     return Math.max(0, Math.floor((Date.now() - Date.parse(start)) / 1000));
   };
-  const updateStretchSettings = async (nextDyn, nextDynRest, nextStat, nextStatRest) => {
+  const updateStretchRow = async (patch) => {
     if (!sb) return;
-    await sb.from("stretch_session").update({
+    const { error } = await sb.from("stretch_session").update(patch).eq("id", 1);
+    if (error) {
+      setToast("Stretch timer update failed. Check Supabase policies.");
+      setTimeout(() => setToast(""), 4000);
+    }
+  };
+  const updateStretchSettings = async (nextDyn, nextDynRest, nextStat, nextStatRest) => {
+    await updateStretchRow({
       dyn_duration: nextDyn,
       dyn_rest: nextDynRest,
       stat_duration: nextStat,
       stat_rest: nextStatRest
-    }).eq("id", 1);
+    });
   };
   const adminStretchStart = async (kind) => {
     if (!sb) return;
@@ -2196,14 +2237,14 @@ function App() {
     patch[`${kind}_elapsed_at_pause`] = 0;
     patch[`${kind}_duration`] = duration;
     patch[`${kind}_rest`] = restVal;
-    await sb.from("stretch_session").update(patch).eq("id", 1);
+    await updateStretchRow(patch);
   };
   const adminStretchPause = async (kind) => {
     if (!sb) return;
     const patch = {};
     patch[`${kind}_status`] = "paused";
     patch[`${kind}_elapsed_at_pause`] = calcStretchElapsed(kind);
-    await sb.from("stretch_session").update(patch).eq("id", 1);
+    await updateStretchRow(patch);
   };
   const adminStretchResume = async (kind) => {
     if (!sb) return;
@@ -2211,7 +2252,7 @@ function App() {
     const patch = {};
     patch[`${kind}_status`] = "running";
     patch[`${kind}_start_time`] = new Date(Date.now() - elapsed * 1000).toISOString();
-    await sb.from("stretch_session").update(patch).eq("id", 1);
+    await updateStretchRow(patch);
   };
   const adminStretchReset = async (kind) => {
     if (!sb) return;
@@ -2223,7 +2264,7 @@ function App() {
     patch[`${kind}_elapsed_at_pause`] = 0;
     patch[`${kind}_duration`] = duration;
     patch[`${kind}_rest`] = restVal;
-    await sb.from("stretch_session").update(patch).eq("id", 1);
+    await updateStretchRow(patch);
   };
 
   // Auto-select first circuit station when list changes
@@ -2866,8 +2907,7 @@ function App() {
                 </div>
               ) : (
                 <>
-                  <div style={{display:"grid", gridTemplateColumns:isSmall ? "1fr" : "1.2fr 0.8fr", gap:"12px", marginBottom:"10px"}}>
-                    <div style={{display:"flex", gap:"10px", flexWrap:"wrap"}}>
+                  <div style={{display:"flex", gap:"10px", flexWrap:"wrap", marginBottom:"10px"}}>
                       <div style={{flex:1, minWidth:"220px"}}>
                         <StretchTimer
                           label="Dynamic Timer"
@@ -2882,6 +2922,16 @@ function App() {
                           list={dynamicList}
                           work={dynStretchTime}
                           rest={dynStretchRest}
+                          onWorkChange={(e) => {
+                            const v = Math.max(5, +e.target.value || 0);
+                            setDynStretchTime(v);
+                            if (sb) updateStretchSettings(v, dynStretchRest, statStretchTime, statStretchRest);
+                          }}
+                          onRestChange={(e) => {
+                            const v = Math.max(0, +e.target.value || 0);
+                            setDynStretchRest(v);
+                            if (sb) updateStretchSettings(dynStretchTime, v, statStretchTime, statStretchRest);
+                          }}
                         />
                       </div>
                       <div style={{flex:1, minWidth:"220px"}}>
@@ -2898,59 +2948,18 @@ function App() {
                           list={staticList}
                           work={statStretchTime}
                           rest={statStretchRest}
+                          onWorkChange={(e) => {
+                            const v = Math.max(5, +e.target.value || 0);
+                            setStatStretchTime(v);
+                            if (sb) updateStretchSettings(dynStretchTime, dynStretchRest, v, statStretchRest);
+                          }}
+                          onRestChange={(e) => {
+                            const v = Math.max(0, +e.target.value || 0);
+                            setStatStretchRest(v);
+                            if (sb) updateStretchSettings(dynStretchTime, dynStretchRest, statStretchTime, v);
+                          }}
                         />
                       </div>
-                    </div>
-                    {admin ? (
-                      <div style={{background:BH.white, borderRadius:"8px", border:`1px solid ${BH.g300}`, padding:"12px 14px"}}>
-                        <div style={{fontSize:"12px", fontWeight:"bold", color:BH.navy, marginBottom:"8px"}}>Timer Settings</div>
-                        <div style={{display:"flex", flexDirection:"column", gap:"8px"}}>
-                          <label style={{fontSize:"12px", color:BH.g700, display:"flex", justifyContent:"space-between", alignItems:"center"}}>
-                            Dynamic Stretch (sec)
-                            <input type="number" value={dynStretchTime} onChange={e => {
-                              const v = Math.max(5, +e.target.value || 0);
-                              setDynStretchTime(v);
-                              if (sb) updateStretchSettings(v, dynStretchRest, statStretchTime, statStretchRest);
-                            }}
-                              style={{width:"70px", padding:"4px 8px", border:`1px solid ${BH.g300}`, borderRadius:"4px"}} min="5" max="1800"/>
-                          </label>
-                          <label style={{fontSize:"12px", color:BH.g700, display:"flex", justifyContent:"space-between", alignItems:"center"}}>
-                            Dynamic Rest (sec)
-                            <input type="number" value={dynStretchRest} onChange={e => {
-                              const v = Math.max(0, +e.target.value || 0);
-                              setDynStretchRest(v);
-                              if (sb) updateStretchSettings(dynStretchTime, v, statStretchTime, statStretchRest);
-                            }}
-                              style={{width:"70px", padding:"4px 8px", border:`1px solid ${BH.g300}`, borderRadius:"4px"}} min="0" max="300"/>
-                          </label>
-                          <label style={{fontSize:"12px", color:BH.g700, display:"flex", justifyContent:"space-between", alignItems:"center"}}>
-                            Static Stretch (sec)
-                            <input type="number" value={statStretchTime} onChange={e => {
-                              const v = Math.max(5, +e.target.value || 0);
-                              setStatStretchTime(v);
-                              if (sb) updateStretchSettings(dynStretchTime, dynStretchRest, v, statStretchRest);
-                            }}
-                              style={{width:"70px", padding:"4px 8px", border:`1px solid ${BH.g300}`, borderRadius:"4px"}} min="5" max="1800"/>
-                          </label>
-                          <label style={{fontSize:"12px", color:BH.g700, display:"flex", justifyContent:"space-between", alignItems:"center"}}>
-                            Static Rest (sec)
-                            <input type="number" value={statStretchRest} onChange={e => {
-                              const v = Math.max(0, +e.target.value || 0);
-                              setStatStretchRest(v);
-                              if (sb) updateStretchSettings(dynStretchTime, dynStretchRest, statStretchTime, v);
-                            }}
-                              style={{width:"70px", padding:"4px 8px", border:`1px solid ${BH.g300}`, borderRadius:"4px"}} min="0" max="300"/>
-                          </label>
-                        </div>
-                      </div>
-                    ) : (
-                      <div style={{background:BH.white, borderRadius:"8px", border:`1px solid ${BH.g300}`, padding:"12px 14px"}}>
-                        <div style={{fontSize:"12px", fontWeight:"bold", color:BH.navy, marginBottom:"6px"}}>Timer Settings</div>
-                        <div style={{fontSize:"12px", color:BH.g700}}>
-                          Dynamic: {dynStretchTime}s + {dynStretchRest}s rest • Static: {statStretchTime}s + {statStretchRest}s rest
-                        </div>
-                      </div>
-                    )}
                   </div>
                   <div style={{display:"grid", gridTemplateColumns:isSmall ? "1fr" : "1fr 1fr", gap:"14px"}}>
                     <div>
