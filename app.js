@@ -151,7 +151,7 @@ function DrillViewer({drill}) {
 }
 
 // DrillTimer Component
-function DrillTimer({duration, resetKey, onNext, canNext, isAdmin}) {
+function DrillTimer({duration, resetKey, onNext, canNext, isAdmin, session, onAdminStart, onAdminPause, onAdminResume, onAdminReset}) {
   const [running, setRunning] = React.useState(false);
   const [timeLeft, setTimeLeft] = React.useState(duration);
   const tmr = React.useRef(null);
@@ -163,7 +163,31 @@ function DrillTimer({duration, resetKey, onNext, canNext, isAdmin}) {
     tmr.current = null;
   }, [duration, resetKey]);
 
+  const sessionMode = !!session;
+  const getStatus = () => session ? session.status : null;
+  const getStart = () => session ? session.start_time : null;
+  const getElapsedAtPause = () => session ? (session.elapsed_at_pause || 0) : 0;
+  const getDuration = () => session && typeof session.duration === "number" ? session.duration : duration;
+  const computeSharedTimeLeft = () => {
+    const status = getStatus();
+    const dur = getDuration();
+    if (!status) return dur;
+    if (status === "idle") return dur;
+    if (status === "paused") return Math.max(0, dur - getElapsedAtPause());
+    const start = getStart();
+    if (!start) return dur;
+    const elapsed = Math.max(0, Math.floor((Date.now() - Date.parse(start)) / 1000));
+    return Math.max(0, dur - elapsed);
+  };
+
   React.useEffect(() => {
+    if (sessionMode) {
+      setTimeLeft(computeSharedTimeLeft());
+      tmr.current = setInterval(() => {
+        setTimeLeft(computeSharedTimeLeft());
+      }, 1000);
+      return () => { if (tmr.current) clearInterval(tmr.current); };
+    }
     if (!running) {
       if (tmr.current) clearInterval(tmr.current);
       tmr.current = null;
@@ -182,7 +206,7 @@ function DrillTimer({duration, resetKey, onNext, canNext, isAdmin}) {
       });
     }, 1000);
     return () => { if (tmr.current) clearInterval(tmr.current); };
-  }, [running]);
+  }, [running, sessionMode]);
 
   const mm = String(Math.floor(timeLeft / 60)).padStart(2, "0");
   const ss = String(timeLeft % 60).padStart(2, "0");
@@ -198,6 +222,10 @@ function DrillTimer({duration, resetKey, onNext, canNext, isAdmin}) {
     fontWeight:"bold"
   });
 
+  const status = sessionMode ? getStatus() : null;
+  const canAdmin = isAdmin && (!sessionMode || !!session);
+  const startLabel = status === "running" ? "Pause" : status === "paused" ? "Resume" : "Start";
+
   return (
     <div style={{background:BH.white, border:`1px solid ${BH.g300}`, borderRadius:"8px", padding:"12px 14px", marginBottom:"10px"}}>
       <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"8px", gap:"8px"}}>
@@ -205,14 +233,34 @@ function DrillTimer({duration, resetKey, onNext, canNext, isAdmin}) {
         <div style={{fontSize:"18px", fontWeight:"bold", color:BH.maroon}}>{mm}:{ss}</div>
       </div>
       <div style={{display:"flex", gap:"8px", flexWrap:"wrap"}}>
-        <button onClick={() => { if (isAdmin) setRunning(r => !r); }} disabled={!isAdmin}
-          style={{...btn(running ? BH.shotRed : BH.shotBlue), cursor:isAdmin ? "pointer" : "not-allowed", opacity:isAdmin ? 1 : 0.6}}>
-          {running ? "Pause" : "Start"}
-        </button>
-        <button onClick={() => { if (isAdmin) setTimeLeft(duration); }} disabled={!isAdmin}
-          style={{...btn(BH.g500), cursor:isAdmin ? "pointer" : "not-allowed", opacity:isAdmin ? 1 : 0.6}}>Reset</button>
-        <button onClick={() => { if (isAdmin) setTimeLeft(t => t + 30); }} disabled={!isAdmin}
-          style={{...btn(BH.navy), cursor:isAdmin ? "pointer" : "not-allowed", opacity:isAdmin ? 1 : 0.6}}>+30s</button>
+        {sessionMode ? (
+          <>
+            <button
+              onClick={() => {
+                if (!canAdmin) return;
+                if (status === "running") onAdminPause();
+                else if (status === "paused") onAdminResume();
+                else onAdminStart();
+              }}
+              disabled={!canAdmin}
+              style={{...btn(status === "running" ? BH.shotRed : BH.shotBlue), cursor:canAdmin ? "pointer" : "not-allowed", opacity:canAdmin ? 1 : 0.6}}>
+              {startLabel}
+            </button>
+            <button onClick={() => { if (canAdmin) onAdminReset(); }} disabled={!canAdmin}
+              style={{...btn(BH.g500), cursor:canAdmin ? "pointer" : "not-allowed", opacity:canAdmin ? 1 : 0.6}}>Reset</button>
+          </>
+        ) : (
+          <>
+            <button onClick={() => { if (isAdmin) setRunning(r => !r); }} disabled={!isAdmin}
+              style={{...btn(running ? BH.shotRed : BH.shotBlue), cursor:isAdmin ? "pointer" : "not-allowed", opacity:isAdmin ? 1 : 0.6}}>
+              {running ? "Pause" : "Start"}
+            </button>
+            <button onClick={() => { if (isAdmin) setTimeLeft(duration); }} disabled={!isAdmin}
+              style={{...btn(BH.g500), cursor:isAdmin ? "pointer" : "not-allowed", opacity:isAdmin ? 1 : 0.6}}>Reset</button>
+            <button onClick={() => { if (isAdmin) setTimeLeft(t => t + 30); }} disabled={!isAdmin}
+              style={{...btn(BH.navy), cursor:isAdmin ? "pointer" : "not-allowed", opacity:isAdmin ? 1 : 0.6}}>+30s</button>
+          </>
+        )}
         <button onClick={onNext} disabled={!canNext} style={{
           ...btn(canNext ? BH.maroon : BH.g300),
           cursor: canNext ? "pointer" : "not-allowed"
@@ -450,6 +498,8 @@ function App() {
   const [isSmall, setIsSmall] = React.useState(window.innerWidth < 768);
   const [session, setSession] = React.useState(null);
   const [sessionReady, setSessionReady] = React.useState(false);
+  const [drillSession, setDrillSession] = React.useState(null);
+  const [drillReady, setDrillReady] = React.useState(false);
   const [stretchSession, setStretchSession] = React.useState(null);
   const [stretchReady, setStretchReady] = React.useState(false);
 
@@ -478,6 +528,7 @@ function App() {
   const [toast, setToast] = React.useState("");
   const [circuitStIdx, setCircuitStIdx] = React.useState(-1);
   const [stretchTick, setStretchTick] = React.useState(0);
+  const [circuitManualUntil, setCircuitManualUntil] = React.useState(0);
 
   // Sync stretch durations from session
   React.useEffect(() => {
@@ -487,6 +538,13 @@ function App() {
     if (typeof stretchSession.stat_duration === "number") setStatStretchTime(Math.max(5, stretchSession.stat_duration));
     if (typeof stretchSession.stat_rest === "number") setStatStretchRest(Math.max(0, stretchSession.stat_rest));
   }, [stretchSession]);
+
+  // Keep non-admin drill selection in sync with shared drill session
+  React.useEffect(() => {
+    if (!drillSession) return;
+    if (admin) return;
+    if (drillSession.drill_id) setViewDrill(drillSession.drill_id);
+  }, [drillSession, admin]);
 
   // Tick while any stretch timer is running so highlights stay in sync
   React.useEffect(() => {
@@ -590,6 +648,26 @@ function App() {
     channel = sb.channel("circuit_session")
       .on("postgres_changes", { event: "*", schema: "public", table: "circuit_session", filter: "id=eq.1" }, (payload) => {
         if (payload.new) setSession(payload.new);
+      })
+      .subscribe();
+    return () => {
+      if (channel) sb.removeChannel(channel);
+    };
+  }, [sb]);
+
+  // Load drill session + subscribe to realtime
+  React.useEffect(() => {
+    let channel = null;
+    if (!sb) return;
+    const loadDrillSession = async () => {
+      const { data, error } = await sb.from("drill_session").select("*").eq("id", 1).single();
+      if (!error) setDrillSession(data);
+      setDrillReady(true);
+    };
+    loadDrillSession();
+    channel = sb.channel("drill_session")
+      .on("postgres_changes", { event: "*", schema: "public", table: "drill_session", filter: "id=eq.1" }, (payload) => {
+        if (payload.new) setDrillSession(payload.new);
       })
       .subscribe();
     return () => {
@@ -934,6 +1012,66 @@ function App() {
     await updateStretchRow(patch);
   };
 
+  // Drill session helpers (admin)
+  const updateDrillRow = async (patch) => {
+    if (!sb) return;
+    const { error } = await sb.from("drill_session").update(patch).eq("id", 1);
+    if (error) {
+      setToast("Drill timer update failed. Check Supabase policies.");
+      setTimeout(() => setToast(""), 4000);
+      return;
+    }
+    setDrillSession(prev => {
+      const base = prev || { id: 1 };
+      return Object.assign({}, base, patch);
+    });
+  };
+  const calcDrillElapsed = () => {
+    if (!drillSession) return 0;
+    if (drillSession.status !== "running") return drillSession.elapsed_at_pause || 0;
+    if (!drillSession.start_time) return 0;
+    return Math.max(0, Math.floor((Date.now() - Date.parse(drillSession.start_time)) / 1000));
+  };
+  const adminDrillStart = async () => {
+    if (!sb) return;
+    const patch = {
+      status: "running",
+      start_time: new Date().toISOString(),
+      elapsed_at_pause: 0,
+      drill_id: viewDrill,
+      duration: currentDrillTimeSafe
+    };
+    await updateDrillRow(patch);
+  };
+  const adminDrillPause = async () => {
+    if (!sb) return;
+    const patch = {
+      status: "paused",
+      elapsed_at_pause: calcDrillElapsed()
+    };
+    await updateDrillRow(patch);
+  };
+  const adminDrillResume = async () => {
+    if (!sb) return;
+    const elapsed = calcDrillElapsed();
+    const patch = {
+      status: "running",
+      start_time: new Date(Date.now() - elapsed * 1000).toISOString()
+    };
+    await updateDrillRow(patch);
+  };
+  const adminDrillReset = async () => {
+    if (!sb) return;
+    const patch = {
+      status: "idle",
+      start_time: null,
+      elapsed_at_pause: 0,
+      drill_id: viewDrill,
+      duration: currentDrillTimeSafe
+    };
+    await updateDrillRow(patch);
+  };
+
   // Auto-select first circuit station when list changes
   React.useEffect(() => {
     if (circuitExercises.length > 0 && (circuitStIdx < 0 || circuitStIdx >= circuitExercises.length)) {
@@ -1154,6 +1292,11 @@ function App() {
                       onNext={goNextDrill}
                       canNext={canNextDrill}
                       isAdmin={admin}
+                      session={drillReady ? drillSession : null}
+                      onAdminStart={adminDrillStart}
+                      onAdminPause={adminDrillPause}
+                      onAdminResume={adminDrillResume}
+                      onAdminReset={adminDrillReset}
                     />
                   </div>
                 )}
@@ -1267,7 +1410,7 @@ function App() {
                   {adminExercises.length > 0 && (
                     <div style={{marginTop:"16px"}}>
                       <CircuitTimer work={work} rest={rest} rounds={rounds} exercises={adminExercises}
-                        onStation={(i) => setCircuitStIdx(i)}
+                        onStation={(i) => { if (Date.now() > circuitManualUntil) setCircuitStIdx(i); }}
                         session={sessionReady ? session : null}
                         isAdmin={admin}
                         onAdminStart={adminStart}
@@ -1322,7 +1465,7 @@ function App() {
                       ) : (
                         playerExercises.map((e, i) => (
                           <button key={e.id} type="button"
-                            onClick={() => setCircuitStIdx(i)}
+                            onClick={() => { setCircuitStIdx(i); setCircuitManualUntil(Date.now() + 8000); }}
                             onPointerDown={() => setCircuitStIdx(i)}
                             onPointerUp={() => setCircuitStIdx(i)}
                             onMouseDown={() => setCircuitStIdx(i)}
@@ -1347,7 +1490,7 @@ function App() {
                   {playerExercises.length > 0 && (
                     <div style={{marginTop:"16px"}}>
                       <CircuitTimer work={work} rest={rest} rounds={rounds} exercises={playerExercises}
-                        onStation={(i) => setCircuitStIdx(i)}
+                        onStation={(i) => { if (Date.now() > circuitManualUntil) setCircuitStIdx(i); }}
                         session={sessionReady ? session : null}
                         isAdmin={false}
                         onAdminStart={adminStart}
@@ -1396,7 +1539,7 @@ function App() {
               ) : (
                 <>
                   <CircuitRing stations={circuitExercises} selectedIdx={circuitStIdx}
-                    onSelect={(i) => setCircuitStIdx(i)}
+                    onSelect={(i) => { setCircuitStIdx(i); setCircuitManualUntil(Date.now() + 8000); }}
                     onRemove={admin ? (i) => {
                       const id = circuitExercises[i] && circuitExercises[i].id;
                       if (id) {
