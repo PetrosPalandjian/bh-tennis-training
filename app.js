@@ -209,7 +209,7 @@ function DrillTimer({duration, resetKey, onNext, canNext, isAdmin, session, onAd
       });
     }, 1000);
     return () => { if (tmr.current) clearInterval(tmr.current); };
-  }, [running, sessionMode]);
+  }, [running, sessionMode, session && session.status, session && session.start_time, session && session.elapsed_at_pause, session && session.duration]);
 
   const mm = String(Math.floor(timeLeft / 60)).padStart(2, "0");
   const ss = String(timeLeft % 60).padStart(2, "0");
@@ -692,6 +692,16 @@ function App() {
     return () => {
       if (channel) sb.removeChannel(channel);
     };
+  }, [sb]);
+
+  // Poll drill session as a fallback if realtime is delayed
+  React.useEffect(() => {
+    if (!sb) return;
+    const t = setInterval(async () => {
+      const { data, error } = await sb.from("drill_session").select("*").eq("id", 1).single();
+      if (!error && data) setDrillSession(data);
+    }, 5000);
+    return () => clearInterval(t);
   }, [sb]);
 
   // Load stretch session + subscribe to realtime
