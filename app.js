@@ -151,7 +151,7 @@ function DrillViewer({drill}) {
 }
 
 // DrillTimer Component
-function DrillTimer({duration, resetKey, onNext, canNext}) {
+function DrillTimer({duration, resetKey, onNext, canNext, isAdmin}) {
   const [running, setRunning] = React.useState(false);
   const [timeLeft, setTimeLeft] = React.useState(duration);
   const tmr = React.useRef(null);
@@ -205,11 +205,14 @@ function DrillTimer({duration, resetKey, onNext, canNext}) {
         <div style={{fontSize:"18px", fontWeight:"bold", color:BH.maroon}}>{mm}:{ss}</div>
       </div>
       <div style={{display:"flex", gap:"8px", flexWrap:"wrap"}}>
-        <button onClick={() => setRunning(r => !r)} style={btn(running ? BH.shotRed : BH.shotBlue)}>
+        <button onClick={() => { if (isAdmin) setRunning(r => !r); }} disabled={!isAdmin}
+          style={{...btn(running ? BH.shotRed : BH.shotBlue), cursor:isAdmin ? "pointer" : "not-allowed", opacity:isAdmin ? 1 : 0.6}}>
           {running ? "Pause" : "Start"}
         </button>
-        <button onClick={() => setTimeLeft(duration)} style={btn(BH.g500)}>Reset</button>
-        <button onClick={() => setTimeLeft(t => t + 30)} style={btn(BH.navy)}>+30s</button>
+        <button onClick={() => { if (isAdmin) setTimeLeft(duration); }} disabled={!isAdmin}
+          style={{...btn(BH.g500), cursor:isAdmin ? "pointer" : "not-allowed", opacity:isAdmin ? 1 : 0.6}}>Reset</button>
+        <button onClick={() => { if (isAdmin) setTimeLeft(t => t + 30); }} disabled={!isAdmin}
+          style={{...btn(BH.navy), cursor:isAdmin ? "pointer" : "not-allowed", opacity:isAdmin ? 1 : 0.6}}>+30s</button>
         <button onClick={onNext} disabled={!canNext} style={{
           ...btn(canNext ? BH.maroon : BH.g300),
           cursor: canNext ? "pointer" : "not-allowed"
@@ -433,10 +436,10 @@ function App() {
   const [drSkill, setDrSkill] = React.useState("All");
   const [exCat, setExCat] = React.useState("All");
   const [stretchType, setStretchType] = React.useState("All");
-  const [dynStretchTime, setDynStretchTime] = React.useState(360);
-  const [dynStretchRest, setDynStretchRest] = React.useState(15);
-  const [statStretchTime, setStatStretchTime] = React.useState(480);
-  const [statStretchRest, setStatStretchRest] = React.useState(15);
+  const [dynStretchTime, setDynStretchTime] = React.useState(30);
+  const [dynStretchRest, setDynStretchRest] = React.useState(5);
+  const [statStretchTime, setStatStretchTime] = React.useState(20);
+  const [statStretchRest, setStatStretchRest] = React.useState(5);
   const [viewDrill, setViewDrill] = React.useState(null);
   const [toast, setToast] = React.useState("");
   const [circuitStIdx, setCircuitStIdx] = React.useState(-1);
@@ -616,6 +619,7 @@ function App() {
       localStorage.setItem("bh-tennis-published", JSON.stringify(cfg));
       setPubDrills(selDrills);
       setPubExercises(selExercises);
+      setPubStretches(selStretches);
       const url = window.location.origin + window.location.pathname + "#config=" + btoa(JSON.stringify(cfg));
       navigator.clipboard.writeText(url).then(() => {
         setToast("Plan published! Link copied to clipboard.");
@@ -632,6 +636,7 @@ function App() {
     }
     setPubDrills(selDrills);
     setPubExercises(selExercises);
+    setPubStretches(selStretches);
     setToast("Plan published for everyone!");
     setTimeout(() => setToast(""), 3000);
   };
@@ -695,7 +700,7 @@ function App() {
   const stretchList = admin ? adminStretches : playerStretches;
   const dynamicList = stretchList.filter(s => s.type === "Dynamic");
   const staticList = stretchList.filter(s => s.type === "Static");
-  const displayStretches = admin ? filteredStretches : stretchList;
+  const displayStretches = stretchList;
 
   // Equipment summary for circuit exercises
   const summarizeEquipment = (items) => {
@@ -1058,6 +1063,7 @@ function App() {
                       resetKey={viewDrill}
                       onNext={goNextDrill}
                       canNext={canNextDrill}
+                      isAdmin={admin}
                     />
                   </div>
                 )}
@@ -1414,6 +1420,54 @@ function App() {
                       )}
                     </div>
                   </div>
+
+                  <div style={{background:BH.white, borderRadius:"8px", border:`2px solid ${BH.shotBlue}`,
+                               marginTop:"12px", overflow:"hidden"}}>
+                    <div style={{padding:"10px 14px", background:BH.shotBlue, color:BH.white,
+                                 fontSize:"13px", fontWeight:"bold"}}>
+                      Today's Dynamic Stretches ({dynamicList.length})
+                    </div>
+                    <div style={{padding:"8px 14px", maxHeight:"140px", overflowY:"auto"}}>
+                      {dynamicList.length === 0 ? (
+                        <div style={{fontSize:"12px", color:BH.g500, padding:"8px 0"}}>
+                          No dynamic stretches selected.
+                        </div>
+                      ) : (
+                        dynamicList.map((s, i) => (
+                          <div key={s.id} style={{display:"flex", gap:"8px", alignItems:"center", padding:"3px 0"}}>
+                            <span style={{fontSize:"11px", fontWeight:"bold", color:BH.shotBlue, minWidth:"18px"}}>{i+1}.</span>
+                            <span style={{fontSize:"12px", color:BH.navy}}>{s.name}</span>
+                            <button onClick={(ev) => { ev.stopPropagation(); toggleStretch(s.id); }} style={{marginLeft:"auto", background:"none",
+                              border:"none", cursor:"pointer", fontSize:"14px", color:BH.g400}}>×</button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  <div style={{background:BH.white, borderRadius:"8px", border:`2px solid ${BH.maroon}`,
+                               marginTop:"12px", overflow:"hidden"}}>
+                    <div style={{padding:"10px 14px", background:BH.maroon, color:BH.white,
+                                 fontSize:"13px", fontWeight:"bold"}}>
+                      Today's Static Stretches ({staticList.length})
+                    </div>
+                    <div style={{padding:"8px 14px", maxHeight:"140px", overflowY:"auto"}}>
+                      {staticList.length === 0 ? (
+                        <div style={{fontSize:"12px", color:BH.g500, padding:"8px 0"}}>
+                          No static stretches selected.
+                        </div>
+                      ) : (
+                        staticList.map((s, i) => (
+                          <div key={s.id} style={{display:"flex", gap:"8px", alignItems:"center", padding:"3px 0"}}>
+                            <span style={{fontSize:"11px", fontWeight:"bold", color:BH.maroon, minWidth:"18px"}}>{i+1}.</span>
+                            <span style={{fontSize:"12px", color:BH.navy}}>{s.name}</span>
+                            <button onClick={(ev) => { ev.stopPropagation(); toggleStretch(s.id); }} style={{marginLeft:"auto", background:"none",
+                              border:"none", cursor:"pointer", fontSize:"14px", color:BH.g400}}>×</button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
                 </>
               ) : (
                 <div style={{background:BH.white, borderRadius:"8px", border:`2px solid ${BH.maroon}`, overflow:"hidden"}}>
@@ -1543,53 +1597,47 @@ function App() {
                       />
                     </div>
                   </div>
-                  <div style={{fontSize:"13px", fontWeight:"bold", color:BH.navy, margin:"4px 0 10px"}}>Pre-Practice</div>
-                  <div style={{display:"grid", gridTemplateColumns:isSmall ? "1fr" : "1fr 1fr", gap:"12px"}}>
-                    {displayStretches.filter(s => s.type === "Dynamic").map(s => {
-                      const badgeColor = BH.shotBlue;
-                      return (
-                        <div key={s.id} style={{background:BH.white, borderRadius:"10px", border:`1px solid ${BH.g300}`,
-                          padding:"14px", display:"flex", flexDirection:"column", gap:"8px"}}>
-                          <div style={{display:"flex", justifyContent:"space-between", gap:"10px", alignItems:"center"}}>
-                            <div style={{fontSize:"14px", fontWeight:"bold", color:BH.navy}}>{s.name}</div>
-                            <span style={{fontSize:"10px", color:BH.white, background:badgeColor, padding:"3px 8px",
-                              borderRadius:"999px", fontWeight:"bold", letterSpacing:"0.3px"}}>
-                              Dynamic
-                            </span>
-                          </div>
-                          <div style={{fontSize:"12px", color:BH.g700, lineHeight:1.35}}>{s.desc}</div>
-                          <div style={{display:"flex", gap:"8px", flexWrap:"wrap", fontSize:"11px", color:BH.g500}}>
-                            <span>{s.area}</span>
-                            <span>•</span>
-                            <span>{s.reps}</span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <div style={{fontSize:"13px", fontWeight:"bold", color:BH.navy, margin:"18px 0 10px"}}>After Practice</div>
-                  <div style={{display:"grid", gridTemplateColumns:isSmall ? "1fr" : "1fr 1fr", gap:"12px"}}>
-                    {displayStretches.filter(s => s.type === "Static").map(s => {
-                      const badgeColor = BH.maroon;
-                      return (
-                        <div key={s.id} style={{background:BH.white, borderRadius:"10px", border:`1px solid ${BH.g300}`,
-                          padding:"14px", display:"flex", flexDirection:"column", gap:"8px"}}>
-                          <div style={{display:"flex", justifyContent:"space-between", gap:"10px", alignItems:"center"}}>
-                            <div style={{fontSize:"14px", fontWeight:"bold", color:BH.navy}}>{s.name}</div>
-                            <span style={{fontSize:"10px", color:BH.white, background:badgeColor, padding:"3px 8px",
-                              borderRadius:"999px", fontWeight:"bold", letterSpacing:"0.3px"}}>
-                              Static
-                            </span>
-                          </div>
-                          <div style={{fontSize:"12px", color:BH.g700, lineHeight:1.35}}>{s.desc}</div>
-                          <div style={{display:"flex", gap:"8px", flexWrap:"wrap", fontSize:"11px", color:BH.g500}}>
-                            <span>{s.area}</span>
-                            <span>•</span>
-                            <span>{s.reps}</span>
-                          </div>
-                        </div>
-                      );
-                    })}
+                  <div style={{display:"grid", gridTemplateColumns:isSmall ? "1fr" : "1fr 1fr", gap:"14px"}}>
+                    <div>
+                      <div style={{fontSize:"13px", fontWeight:"bold", color:BH.navy, margin:"4px 0 10px"}}>Pre-Practice</div>
+                      <div style={{background:BH.white, borderRadius:"8px", border:`1px solid ${BH.g300}`}}>
+                        {dynamicList.length === 0 ? (
+                          <div style={{padding:"16px", fontSize:"12px", color:BH.g500}}>No dynamic stretches selected.</div>
+                        ) : (
+                          dynamicList.map((s, i) => (
+                            <div key={s.id} style={{padding:"10px 14px", borderBottom:`1px solid ${BH.g100}`}}>
+                              <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", gap:"10px"}}>
+                                <div style={{fontSize:"13px", fontWeight:"bold", color:BH.navy}}>{i+1}. {s.name}</div>
+                                <span style={{fontSize:"10px", color:BH.white, background:BH.shotBlue, padding:"3px 8px",
+                                  borderRadius:"999px", fontWeight:"bold", letterSpacing:"0.3px"}}>Dynamic</span>
+                              </div>
+                              <div style={{fontSize:"11px", color:BH.g700, marginTop:"4px"}}>{s.desc}</div>
+                              <div style={{fontSize:"11px", color:BH.g500, marginTop:"4px"}}>{s.area} • {s.reps}</div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{fontSize:"13px", fontWeight:"bold", color:BH.navy, margin:"4px 0 10px"}}>After Practice</div>
+                      <div style={{background:BH.white, borderRadius:"8px", border:`1px solid ${BH.g300}`}}>
+                        {staticList.length === 0 ? (
+                          <div style={{padding:"16px", fontSize:"12px", color:BH.g500}}>No static stretches selected.</div>
+                        ) : (
+                          staticList.map((s, i) => (
+                            <div key={s.id} style={{padding:"10px 14px", borderBottom:`1px solid ${BH.g100}`}}>
+                              <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", gap:"10px"}}>
+                                <div style={{fontSize:"13px", fontWeight:"bold", color:BH.navy}}>{i+1}. {s.name}</div>
+                                <span style={{fontSize:"10px", color:BH.white, background:BH.maroon, padding:"3px 8px",
+                                  borderRadius:"999px", fontWeight:"bold", letterSpacing:"0.3px"}}>Static</span>
+                              </div>
+                              <div style={{fontSize:"11px", color:BH.g700, marginTop:"4px"}}>{s.desc}</div>
+                              <div style={{fontSize:"11px", color:BH.g500, marginTop:"4px"}}>{s.area} • {s.reps}</div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </>
               )}
