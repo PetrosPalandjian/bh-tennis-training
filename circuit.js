@@ -388,10 +388,10 @@ function CircuitTimer({work, rest, rounds, exercises, onStation, onPhaseInfo, se
       </div>
 
       {/* Control buttons */}
-      <div style={{display: "flex", gap: "8px"}}>
+      <div style={{display: "flex", gap: "8px", flexWrap: "wrap", justifyContent: "flex-end"}}>
         {effectivePhase === "idle" && (
           <button onClick={sessionMode ? onAdminStart : start} disabled={sessionMode && !isAdmin} style={{
-            padding: "8px 16px",
+            padding: "8px 12px",
             background: BH.shotBlue,
             color: BH.white,
             border: "none",
@@ -407,7 +407,7 @@ function CircuitTimer({work, rest, rounds, exercises, onStation, onPhaseInfo, se
         )}
         {isRunning && (
           <button onClick={sessionMode ? onAdminPause : pause} disabled={sessionMode && !isAdmin} style={{
-            padding: "8px 14px",
+            padding: "8px 12px",
             background: BH.shotGold,
             color: BH.navy,
             border: "none",
@@ -423,7 +423,7 @@ function CircuitTimer({work, rest, rounds, exercises, onStation, onPhaseInfo, se
         )}
         {isPaused && (
           <button onClick={sessionMode ? onAdminResume : resume} disabled={sessionMode && !isAdmin} style={{
-            padding: "8px 14px",
+            padding: "8px 12px",
             background: BH.shotBlue,
             color: BH.white,
             border: "none",
@@ -439,7 +439,7 @@ function CircuitTimer({work, rest, rounds, exercises, onStation, onPhaseInfo, se
         )}
         {(isRunning || isPaused || effectivePhase === "done") && (
           <button onClick={sessionMode ? onAdminReset : reset} disabled={sessionMode && !isAdmin} style={{
-            padding: "8px 14px",
+            padding: "8px 12px",
             background: BH.g400,
             color: BH.white,
             border: "none",
