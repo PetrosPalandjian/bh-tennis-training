@@ -220,62 +220,76 @@ function DrillTimer({duration, resetKey, onNext, canNext}) {
 }
 
 // StretchTimer Component
-function StretchTimer({label, duration, color, session, kind, isAdmin, onAdminStart, onAdminPause, onAdminResume, onAdminReset}) {
-  const [running, setRunning] = React.useState(false);
-  const [timeLeft, setTimeLeft] = React.useState(duration);
+function StretchTimer({label, color, session, kind, isAdmin, onAdminStart, onAdminPause, onAdminResume, onAdminReset, list, work, rest}) {
+  const [tick, setTick] = React.useState(0);
   const tmr = React.useRef(null);
 
-  const getStatus = () => session ? session[`${kind}_status`] : null;
+  const getStatus = () => session ? session[`${kind}_status`] : "idle";
   const getStart = () => session ? session[`${kind}_start_time`] : null;
   const getElapsedAtPause = () => session ? (session[`${kind}_elapsed_at_pause`] || 0) : 0;
-  const computeSharedTimeLeft = () => {
+  const getElapsed = () => {
     const status = getStatus();
-    if (!status) return duration;
-    if (status === "idle") return duration;
-    if (status === "paused") return Math.max(0, duration - getElapsedAtPause());
+    if (status === "paused") return getElapsedAtPause();
+    if (status !== "running") return 0;
     const start = getStart();
-    if (!start) return duration;
-    const elapsed = Math.max(0, Math.floor((Date.now() - Date.parse(start)) / 1000));
-    return Math.max(0, duration - elapsed);
+    if (!start) return 0;
+    return Math.max(0, Math.floor((Date.now() - Date.parse(start)) / 1000));
   };
 
   React.useEffect(() => {
-    setRunning(false);
-    setTimeLeft(duration);
-    if (tmr.current) clearInterval(tmr.current);
-    tmr.current = null;
-  }, [duration]);
-
-  React.useEffect(() => {
-    if (session) {
-      setTimeLeft(computeSharedTimeLeft());
-      tmr.current = setInterval(() => {
-        setTimeLeft(computeSharedTimeLeft());
-      }, 1000);
-      return () => { if (tmr.current) clearInterval(tmr.current); };
-    }
-    if (!running) {
-      if (tmr.current) clearInterval(tmr.current);
-      tmr.current = null;
-      return;
-    }
-    tmr.current = setInterval(() => {
-      setTimeLeft(t => {
-        if (t <= 1) {
-          setRunning(false);
-          if (tmr.current) clearInterval(tmr.current);
-          tmr.current = null;
-          try { snd.done(); } catch(e) {}
-          return 0;
-        }
-        return t - 1;
-      });
-    }, 1000);
+    if (!session) return;
+    setTick(t => t + 1);
+    tmr.current = setInterval(() => setTick(t => t + 1), 1000);
     return () => { if (tmr.current) clearInterval(tmr.current); };
-  }, [running]);
+  }, [session]);
+
+  const safeWork = Math.max(1, work || 0);
+  const safeRest = Math.max(0, rest || 0);
+  const count = Array.isArray(list) ? list.length : 0;
+  const per = safeWork + safeRest;
+  const total = count > 0 ? (count * safeWork + Math.max(0, count - 1) * safeRest) : 0;
+  const elapsed = Math.min(getElapsed(), total);
+
+  let idx = -1;
+  let phase = "idle";
+  let timeLeft = safeWork;
+  let title = "No stretches selected";
+  if (count > 0) {
+    if (elapsed >= total) {
+      idx = count - 1;
+      phase = "done";
+      timeLeft = 0;
+      title = "Complete";
+    } else {
+      idx = Math.min(count - 1, Math.floor(elapsed / per));
+      const cycleStart = idx * per;
+      const cyclePos = Math.max(0, elapsed - cycleStart);
+      if (idx === count - 1) {
+        if (cyclePos < safeWork) {
+          phase = "stretch";
+          timeLeft = safeWork - cyclePos;
+          title = list[idx].name;
+        } else {
+          phase = "done";
+          timeLeft = 0;
+          title = "Complete";
+        }
+      } else {
+        if (cyclePos < safeWork) {
+          phase = "stretch";
+          timeLeft = safeWork - cyclePos;
+          title = list[idx].name;
+        } else {
+          phase = "rest";
+          timeLeft = safeRest - (cyclePos - safeWork);
+          title = "Rest";
+        }
+      }
+    }
+  }
 
   const mm = String(Math.floor(timeLeft / 60)).padStart(2, "0");
-  const ss = String(timeLeft % 60).padStart(2, "0");
+  const ss = String(Math.floor(timeLeft % 60)).padStart(2, "0");
   const btn = (bg) => ({
     padding:"8px 12px",
     background:bg,
@@ -287,49 +301,41 @@ function StretchTimer({label, duration, color, session, kind, isAdmin, onAdminSt
     fontWeight:"bold"
   });
 
-  const status = session ? getStatus() : null;
+  const status = getStatus();
   const canAdmin = isAdmin && !!session;
   const startLabel = status === "running" ? "Pause" : status === "paused" ? "Resume" : "Start";
+  const sub = phase === "rest" ? `Rest ${safeRest}s` : phase === "done" ? "Done" : `Stretch ${safeWork}s`;
 
   return (
     <div style={{background:BH.white, border:`1px solid ${BH.g300}`, borderRadius:"8px", padding:"12px 14px"}}>
-      <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"8px", gap:"8px"}}>
+      <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"6px", gap:"8px"}}>
         <div style={{fontSize:"12px", fontWeight:"bold", color:BH.navy}}>{label}</div>
         <div style={{fontSize:"18px", fontWeight:"bold", color:color}}>{mm}:{ss}</div>
       </div>
+      <div style={{fontSize:"12px", color:BH.g700, marginBottom:"8px"}}>
+        {title}{count > 0 ? ` • ${idx + 1}/${count}` : ""} • {sub}
+      </div>
       <div style={{display:"flex", gap:"8px", flexWrap:"wrap"}}>
-        {session ? (
-          <>
-            <button
-              onClick={() => {
-                if (!canAdmin) return;
-                if (status === "running") onAdminPause();
-                else if (status === "paused") onAdminResume();
-                else onAdminStart();
-              }}
-              disabled={!canAdmin}
-              style={{
-                ...btn(status === "running" ? BH.shotRed : BH.shotBlue),
-                cursor: canAdmin ? "pointer" : "not-allowed",
-                opacity: canAdmin ? 1 : 0.6
-              }}>
-              {startLabel}
-            </button>
-            <button onClick={() => { if (canAdmin) onAdminReset(); }} disabled={!canAdmin} style={{
-              ...btn(BH.g500),
-              cursor: canAdmin ? "pointer" : "not-allowed",
-              opacity: canAdmin ? 1 : 0.6
-            }}>Reset</button>
-          </>
-        ) : (
-          <>
-            <button onClick={() => setRunning(r => !r)} style={btn(running ? BH.shotRed : BH.shotBlue)}>
-              {running ? "Pause" : "Start"}
-            </button>
-            <button onClick={() => setTimeLeft(duration)} style={btn(BH.g500)}>Reset</button>
-            <button onClick={() => setTimeLeft(t => t + 30)} style={btn(BH.navy)}>+30s</button>
-          </>
-        )}
+        <button
+          onClick={() => {
+            if (!canAdmin) return;
+            if (status === "running") onAdminPause();
+            else if (status === "paused") onAdminResume();
+            else onAdminStart();
+          }}
+          disabled={!canAdmin || count === 0}
+          style={{
+            ...btn(status === "running" ? BH.shotRed : BH.shotBlue),
+            cursor: canAdmin ? "pointer" : "not-allowed",
+            opacity: canAdmin && count > 0 ? 1 : 0.6
+          }}>
+          {startLabel}
+        </button>
+        <button onClick={() => { if (canAdmin) onAdminReset(); }} disabled={!canAdmin} style={{
+          ...btn(BH.g500),
+          cursor: canAdmin ? "pointer" : "not-allowed",
+          opacity: canAdmin ? 1 : 0.6
+        }}>Reset</button>
       </div>
     </div>
   );
@@ -413,6 +419,7 @@ function App() {
   // Published plan state
   const [pubDrills, setPubDrills] = React.useState([]);
   const [pubExercises, setPubExercises] = React.useState([]);
+  const [pubStretches, setPubStretches] = React.useState([]);
   const [work, setWork] = React.useState(45);
   const [rest, setRest] = React.useState(15);
   const [rounds, setRounds] = React.useState(3);
@@ -420,13 +427,16 @@ function App() {
   // Admin selection state
   const [selDrills, setSelDrills] = React.useState([]);
   const [selExercises, setSelExercises] = React.useState([]);
+  const [selStretches, setSelStretches] = React.useState([]);
 
   // UI state
   const [drSkill, setDrSkill] = React.useState("All");
   const [exCat, setExCat] = React.useState("All");
   const [stretchType, setStretchType] = React.useState("All");
   const [dynStretchTime, setDynStretchTime] = React.useState(360);
+  const [dynStretchRest, setDynStretchRest] = React.useState(15);
   const [statStretchTime, setStatStretchTime] = React.useState(480);
+  const [statStretchRest, setStatStretchRest] = React.useState(15);
   const [viewDrill, setViewDrill] = React.useState(null);
   const [toast, setToast] = React.useState("");
   const [circuitStIdx, setCircuitStIdx] = React.useState(-1);
@@ -435,7 +445,9 @@ function App() {
   React.useEffect(() => {
     if (!stretchSession) return;
     if (typeof stretchSession.dyn_duration === "number") setDynStretchTime(stretchSession.dyn_duration);
+    if (typeof stretchSession.dyn_rest === "number") setDynStretchRest(stretchSession.dyn_rest);
     if (typeof stretchSession.stat_duration === "number") setStatStretchTime(stretchSession.stat_duration);
+    if (typeof stretchSession.stat_rest === "number") setStatStretchRest(stretchSession.stat_rest);
   }, [stretchSession]);
 
   // Load config on mount
@@ -462,12 +474,18 @@ function App() {
       const normDrills = normalizeDrills(c.drills || [], defaultTime);
       setPubDrills(normDrills);
       setPubExercises(c.exercises || []);
+      setPubStretches(c.stretches || []);
       setSelDrills(normDrills);
       setSelExercises(c.exercises || []);
+      setSelStretches(c.stretches || []);
       setWork(c.work || 45);
       setRest(c.rest || 15);
       setRounds(c.rounds || 3);
       setDrillTime(defaultTime);
+      if (typeof c.dynStretchTime === "number") setDynStretchTime(c.dynStretchTime);
+      if (typeof c.dynStretchRest === "number") setDynStretchRest(c.dynStretchRest);
+      if (typeof c.statStretchTime === "number") setStatStretchTime(c.statStretchTime);
+      if (typeof c.statStretchRest === "number") setStatStretchRest(c.statStretchRest);
     };
     const loadFromSupabase = async () => {
       const res = await sbRest("published_plan?select=data&id=eq.1", { method: "GET" });
@@ -581,7 +599,19 @@ function App() {
 
   // Publish handler
   const handlePublish = async () => {
-    const cfg = { drills: selDrills, exercises: selExercises, work, rest, rounds, drillTime };
+    const cfg = {
+      drills: selDrills,
+      exercises: selExercises,
+      stretches: selStretches,
+      work,
+      rest,
+      rounds,
+      drillTime,
+      dynStretchTime,
+      dynStretchRest,
+      statStretchTime,
+      statStretchRest
+    };
     const doLocalPublish = () => {
       localStorage.setItem("bh-tennis-published", JSON.stringify(cfg));
       setPubDrills(selDrills);
@@ -619,6 +649,9 @@ function App() {
   const toggleExercise = (id) => {
     setSelExercises(sel => sel.includes(id) ? sel.filter(x => x !== id) : [...sel, id]);
   };
+  const toggleStretch = (id) => {
+    setSelStretches(sel => sel.includes(id) ? sel.filter(x => x !== id) : [...sel, id]);
+  };
 
   // Filtered lists for admin category browsing
   const filteredDrills = DRILLS.filter(d =>
@@ -635,6 +668,7 @@ function App() {
 
   // The exercise list for non-admin
   const playerExercises = pubExercises.map(id => EXERCISES.find(e => e.id === id)).filter(Boolean);
+  const playerStretches = pubStretches.map(id => STRETCHES.find(s => s.id === id)).filter(Boolean);
 
   // Current drill for viewer
   const currentViewDrill = viewDrill ? DRILLS.find(d => d.id === viewDrill) : null;
@@ -654,9 +688,14 @@ function App() {
 
   // Admin's selected exercises for circuit
   const adminExercises = selExercises.map(id => EXERCISES.find(e => e.id === id)).filter(Boolean);
+  const adminStretches = selStretches.map(id => STRETCHES.find(s => s.id === id)).filter(Boolean);
 
   // Circuit exercises to display
   const circuitExercises = admin ? adminExercises : playerExercises;
+  const stretchList = admin ? adminStretches : playerStretches;
+  const dynamicList = stretchList.filter(s => s.type === "Dynamic");
+  const staticList = stretchList.filter(s => s.type === "Static");
+  const displayStretches = admin ? filteredStretches : stretchList;
 
   // Equipment summary for circuit exercises
   const summarizeEquipment = (items) => {
@@ -751,21 +790,25 @@ function App() {
     if (!start) return 0;
     return Math.max(0, Math.floor((Date.now() - Date.parse(start)) / 1000));
   };
-  const updateStretchDurations = async (nextDyn, nextStat) => {
+  const updateStretchSettings = async (nextDyn, nextDynRest, nextStat, nextStatRest) => {
     if (!sb) return;
     await sb.from("stretch_session").update({
       dyn_duration: nextDyn,
-      stat_duration: nextStat
+      dyn_rest: nextDynRest,
+      stat_duration: nextStat,
+      stat_rest: nextStatRest
     }).eq("id", 1);
   };
   const adminStretchStart = async (kind) => {
     if (!sb) return;
     const duration = kind === "dyn" ? dynStretchTime : statStretchTime;
+    const restVal = kind === "dyn" ? dynStretchRest : statStretchRest;
     const patch = {};
     patch[`${kind}_status`] = "running";
     patch[`${kind}_start_time`] = new Date().toISOString();
     patch[`${kind}_elapsed_at_pause`] = 0;
     patch[`${kind}_duration`] = duration;
+    patch[`${kind}_rest`] = restVal;
     await sb.from("stretch_session").update(patch).eq("id", 1);
   };
   const adminStretchPause = async (kind) => {
@@ -786,11 +829,13 @@ function App() {
   const adminStretchReset = async (kind) => {
     if (!sb) return;
     const duration = kind === "dyn" ? dynStretchTime : statStretchTime;
+    const restVal = kind === "dyn" ? dynStretchRest : statStretchRest;
     const patch = {};
     patch[`${kind}_status`] = "idle";
     patch[`${kind}_start_time`] = null;
     patch[`${kind}_elapsed_at_pause`] = 0;
     patch[`${kind}_duration`] = duration;
+    patch[`${kind}_rest`] = restVal;
     await sb.from("stretch_session").update(patch).eq("id", 1);
   };
 
@@ -1313,12 +1358,93 @@ function App() {
         {/* ===== STRETCHES TAB ===== */}
         {tab === "stretches" && (
           <div style={{display:"flex", gap:"20px", flexDirection:isMobile ? "column" : "row"}}>
-            <div style={{width:isMobile ? "100%" : "260px", flexShrink:0}}>
+            <div style={{width:isMobile ? "100%" : "300px", flexShrink:0}}>
               <div style={{display:"flex", flexWrap:"wrap", gap:"6px", marginBottom:"16px"}}>
                 {STRETCH_TYPES.map(t => (
                   <button key={t} onClick={() => setStretchType(t)} style={catBtn(stretchType===t)}>{t}</button>
                 ))}
               </div>
+
+              {admin ? (
+                <>
+                  <div style={{background:BH.white, borderRadius:"8px", border:`1px solid ${BH.g300}`,
+                               maxHeight:isSmall ? "260px" : "350px", overflowY:"auto"}}>
+                    <div style={{padding:"12px 14px", borderBottom:`1px solid ${BH.g200}`,
+                                 fontSize:"13px", fontWeight:"bold", color:BH.navy}}>
+                      All Stretches
+                    </div>
+                    {filteredStretches.map(s => (
+                      <div key={s.id} style={{padding:isSmall ? "10px 14px" : "8px 14px", display:"flex", gap:"8px", alignItems:"center",
+                        cursor:"pointer", borderBottom:`1px solid ${BH.g100}`}}
+                        onClick={() => toggleStretch(s.id)}>
+                        <input type="checkbox" checked={selStretches.includes(s.id)}
+                          onChange={() => {}} style={{cursor:"pointer", accentColor:BH.navy, transform:isSmall ? "scale(1.1)" : "none"}}/>
+                        <div style={{flex:1}}>
+                          <div style={{fontSize:isSmall ? "13px" : "12px", fontWeight:"bold", color:BH.navy}}>{s.name}</div>
+                          <div style={{fontSize:isSmall ? "11px" : "10px", color:BH.g500}}>{s.type} • {s.area}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div style={{background:BH.white, borderRadius:"8px", border:`2px solid ${BH.maroon}`,
+                               marginTop:"16px", overflow:"hidden"}}>
+                    <div style={{padding:"10px 14px", background:BH.maroon, color:BH.white,
+                                 fontSize:"13px", fontWeight:"bold"}}>
+                      Today's Stretches ({selStretches.length})
+                    </div>
+                    <div style={{padding:"8px 14px", maxHeight:"150px", overflowY:"auto"}}>
+                      {selStretches.length === 0 ? (
+                        <div style={{fontSize:"12px", color:BH.g500, padding:"8px 0"}}>
+                          Check stretches above to build today's plan
+                        </div>
+                      ) : (
+                        selStretches.map((id, i) => {
+                          const s = STRETCHES.find(st => st.id === id);
+                          if (!s) return null;
+                          return (
+                            <div key={id} style={{display:"flex", gap:"8px", alignItems:"center", padding:"3px 0"}}>
+                              <span style={{fontSize:"11px", fontWeight:"bold", color:BH.maroon, minWidth:"18px"}}>{i+1}.</span>
+                              <span style={{fontSize:"12px", color:BH.navy}}>{s.name}</span>
+                              <button onClick={(ev) => { ev.stopPropagation(); toggleStretch(id); }} style={{marginLeft:"auto", background:"none",
+                                border:"none", cursor:"pointer", fontSize:"14px", color:BH.g400}}>×</button>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div style={{background:BH.white, borderRadius:"8px", border:`2px solid ${BH.maroon}`, overflow:"hidden"}}>
+                  <div style={{padding:"12px 16px", background:BH.maroon, color:BH.white}}>
+                    <div style={{fontSize:"15px", fontWeight:"bold"}}>Today's Stretches</div>
+                    <div style={{fontSize:"11px", opacity:0.8}}>
+                      {dynamicList.length} dynamic • {staticList.length} static
+                    </div>
+                  </div>
+                  <div style={{padding:"8px 0"}}>
+                    {stretchList.length === 0 ? (
+                      <div style={{padding:"20px 16px", textAlign:"center", fontSize:"13px", color:BH.g500}}>
+                        No stretches published yet. Check back later!
+                      </div>
+                    ) : (
+                      stretchList.map((s, i) => (
+                        <div key={s.id}
+                          style={{padding:"8px 16px", display:"flex", gap:"10px", alignItems:"center",
+                            borderBottom:`1px solid ${BH.g100}`}}>
+                          <span style={{fontSize:"14px", fontWeight:"bold", color:BH.maroon, minWidth:"24px"}}>{i+1}</span>
+                          <div>
+                            <div style={{fontSize:"13px", fontWeight:"bold", color:BH.navy}}>{s.name}</div>
+                            <div style={{fontSize:"11px", color:BH.g500}}>{s.type} • {s.reps}</div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+
               <div style={{background:BH.white, borderRadius:"8px", border:`1px solid ${BH.g300}`, padding:"12px 14px"}}>
                 <div style={{fontSize:"12px", fontWeight:"bold", color:BH.navy, marginBottom:"6px"}}>Stretching Notes</div>
                 <div style={{fontSize:"12px", color:BH.g700, lineHeight:1.4}}>
@@ -1327,37 +1453,57 @@ function App() {
               </div>
               {admin ? (
                 <div style={{background:BH.white, borderRadius:"8px", border:`1px solid ${BH.g300}`, padding:"12px 14px", marginTop:"12px"}}>
-                  <div style={{fontSize:"12px", fontWeight:"bold", color:BH.navy, marginBottom:"8px"}}>Timer Defaults</div>
+                  <div style={{fontSize:"12px", fontWeight:"bold", color:BH.navy, marginBottom:"8px"}}>Timer Settings</div>
                   <div style={{display:"flex", flexDirection:"column", gap:"8px"}}>
                     <label style={{fontSize:"12px", color:BH.g700, display:"flex", justifyContent:"space-between", alignItems:"center"}}>
-                      Dynamic (sec)
+                      Dynamic Stretch (sec)
                       <input type="number" value={dynStretchTime} onChange={e => {
-                        const v = Math.max(30, +e.target.value || 0);
+                        const v = Math.max(5, +e.target.value || 0);
                         setDynStretchTime(v);
-                        if (sb) updateStretchDurations(v, statStretchTime);
+                        if (sb) updateStretchSettings(v, dynStretchRest, statStretchTime, statStretchRest);
                       }}
-                        style={{width:"70px", padding:"4px 8px", border:`1px solid ${BH.g300}`, borderRadius:"4px"}} min="30" max="1800"/>
+                        style={{width:"70px", padding:"4px 8px", border:`1px solid ${BH.g300}`, borderRadius:"4px"}} min="5" max="1800"/>
                     </label>
                     <label style={{fontSize:"12px", color:BH.g700, display:"flex", justifyContent:"space-between", alignItems:"center"}}>
-                      Static (sec)
-                      <input type="number" value={statStretchTime} onChange={e => {
-                        const v = Math.max(30, +e.target.value || 0);
-                        setStatStretchTime(v);
-                        if (sb) updateStretchDurations(dynStretchTime, v);
+                      Dynamic Rest (sec)
+                      <input type="number" value={dynStretchRest} onChange={e => {
+                        const v = Math.max(0, +e.target.value || 0);
+                        setDynStretchRest(v);
+                        if (sb) updateStretchSettings(dynStretchTime, v, statStretchTime, statStretchRest);
                       }}
-                        style={{width:"70px", padding:"4px 8px", border:`1px solid ${BH.g300}`, borderRadius:"4px"}} min="30" max="1800"/>
+                        style={{width:"70px", padding:"4px 8px", border:`1px solid ${BH.g300}`, borderRadius:"4px"}} min="0" max="300"/>
+                    </label>
+                    <label style={{fontSize:"12px", color:BH.g700, display:"flex", justifyContent:"space-between", alignItems:"center"}}>
+                      Static Stretch (sec)
+                      <input type="number" value={statStretchTime} onChange={e => {
+                        const v = Math.max(5, +e.target.value || 0);
+                        setStatStretchTime(v);
+                        if (sb) updateStretchSettings(dynStretchTime, dynStretchRest, v, statStretchRest);
+                      }}
+                        style={{width:"70px", padding:"4px 8px", border:`1px solid ${BH.g300}`, borderRadius:"4px"}} min="5" max="1800"/>
+                    </label>
+                    <label style={{fontSize:"12px", color:BH.g700, display:"flex", justifyContent:"space-between", alignItems:"center"}}>
+                      Static Rest (sec)
+                      <input type="number" value={statStretchRest} onChange={e => {
+                        const v = Math.max(0, +e.target.value || 0);
+                        setStatStretchRest(v);
+                        if (sb) updateStretchSettings(dynStretchTime, dynStretchRest, statStretchTime, v);
+                      }}
+                        style={{width:"70px", padding:"4px 8px", border:`1px solid ${BH.g300}`, borderRadius:"4px"}} min="0" max="300"/>
                     </label>
                   </div>
                 </div>
               ) : (
                 <div style={{background:BH.white, borderRadius:"8px", border:`1px solid ${BH.g300}`, padding:"12px 14px", marginTop:"12px"}}>
-                  <div style={{fontSize:"12px", fontWeight:"bold", color:BH.navy, marginBottom:"6px"}}>Timer Defaults</div>
-                  <div style={{fontSize:"12px", color:BH.g700}}>Dynamic: {dynStretchTime}s • Static: {statStretchTime}s</div>
+                  <div style={{fontSize:"12px", fontWeight:"bold", color:BH.navy, marginBottom:"6px"}}>Timer Settings</div>
+                  <div style={{fontSize:"12px", color:BH.g700}}>
+                    Dynamic: {dynStretchTime}s + {dynStretchRest}s rest • Static: {statStretchTime}s + {statStretchRest}s rest
+                  </div>
                 </div>
               )}
             </div>
             <div style={{flex:1, minWidth:0}}>
-              {filteredStretches.length === 0 ? (
+              {displayStretches.length === 0 ? (
                 <div style={{textAlign:"center", padding:"60px 20px", color:BH.g500}}>
                   No stretches found for this filter.
                 </div>
@@ -1367,7 +1513,6 @@ function App() {
                     <div style={{flex:1, minWidth:"220px"}}>
                       <StretchTimer
                         label="Dynamic Timer"
-                        duration={dynStretchTime}
                         color={BH.shotBlue}
                         session={stretchReady ? stretchSession : null}
                         kind="dyn"
@@ -1376,12 +1521,14 @@ function App() {
                         onAdminPause={() => adminStretchPause("dyn")}
                         onAdminResume={() => adminStretchResume("dyn")}
                         onAdminReset={() => adminStretchReset("dyn")}
+                        list={dynamicList}
+                        work={dynStretchTime}
+                        rest={dynStretchRest}
                       />
                     </div>
                     <div style={{flex:1, minWidth:"220px"}}>
                       <StretchTimer
                         label="Static Timer"
-                        duration={statStretchTime}
                         color={BH.maroon}
                         session={stretchReady ? stretchSession : null}
                         kind="stat"
@@ -1390,12 +1537,15 @@ function App() {
                         onAdminPause={() => adminStretchPause("stat")}
                         onAdminResume={() => adminStretchResume("stat")}
                         onAdminReset={() => adminStretchReset("stat")}
+                        list={staticList}
+                        work={statStretchTime}
+                        rest={statStretchRest}
                       />
                     </div>
                   </div>
                   <div style={{fontSize:"13px", fontWeight:"bold", color:BH.navy, margin:"4px 0 10px"}}>Pre-Practice</div>
                   <div style={{display:"grid", gridTemplateColumns:isSmall ? "1fr" : "1fr 1fr", gap:"12px"}}>
-                    {filteredStretches.filter(s => s.type === "Dynamic").map(s => {
+                    {displayStretches.filter(s => s.type === "Dynamic").map(s => {
                       const badgeColor = BH.shotBlue;
                       return (
                         <div key={s.id} style={{background:BH.white, borderRadius:"10px", border:`1px solid ${BH.g300}`,
@@ -1419,7 +1569,7 @@ function App() {
                   </div>
                   <div style={{fontSize:"13px", fontWeight:"bold", color:BH.navy, margin:"18px 0 10px"}}>After Practice</div>
                   <div style={{display:"grid", gridTemplateColumns:isSmall ? "1fr" : "1fr 1fr", gap:"12px"}}>
-                    {filteredStretches.filter(s => s.type === "Static").map(s => {
+                    {displayStretches.filter(s => s.type === "Static").map(s => {
                       const badgeColor = BH.maroon;
                       return (
                         <div key={s.id} style={{background:BH.white, borderRadius:"10px", border:`1px solid ${BH.g300}`,
