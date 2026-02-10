@@ -219,33 +219,30 @@ function DrillTimer({duration, resetKey, onNext, canNext}) {
   );
 }
 
-// LoginModal Component
+// LoginModal Component (Supabase email/password)
 function LoginModal({onLogin, onClose}) {
-  const [un, setUn] = React.useState("");
+  const [email, setEmail] = React.useState("");
   const [pw, setPw] = React.useState("");
   const [err, setErr] = React.useState("");
 
   const handleLogin = async () => {
-    if (!un.trim() || !pw.trim()) { setErr("Enter username and password"); return; }
-    const pwh = await sha256(pw);
-    if (un === "BHTennis" && pwh === "b58f004c95d0a0c859256c96ac33f70e5ccc9cadaf17997425f883bbcbb6cfdd") {
-      setErr("");
-      onLogin();
-    } else {
-      setErr("Invalid credentials");
-    }
+    setErr("");
+    const e = email.trim().toLowerCase();
+    if (!e || !pw) { setErr("Enter email and password"); return; }
+    const ok = await onLogin(e, pw);
+    if (!ok) setErr("Invalid credentials or not authorized");
   };
 
   return (
     <div style={{position:"fixed", top:0, left:0, right:0, bottom:0, background:"rgba(0,0,0,0.5)",
                  display:"flex", alignItems:"center", justifyContent:"center", zIndex:1000}}>
-      <div style={{background:BH.white, padding:"32px", borderRadius:"12px", width:"100%", maxWidth:"340px",
+      <div style={{background:BH.white, padding:"32px", borderRadius:"12px", width:"100%", maxWidth:"360px",
                    boxShadow:"0 10px 40px rgba(0,0,0,0.2)"}}>
         <div style={{textAlign:"center", marginBottom:"20px"}}>
           <div style={{fontSize:"20px", fontWeight:"bold", color:BH.navy}}>Admin Login</div>
           <div style={{fontSize:"12px", color:BH.g500, marginTop:"4px"}}>Belmont Hill Tennis</div>
         </div>
-        <input type="text" placeholder="Username" value={un} onChange={e => setUn(e.target.value)}
+        <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)}
           style={{width:"100%", padding:"10px 12px", marginBottom:"12px", border:`1px solid ${BH.g300}`,
                   borderRadius:"6px", fontSize:"14px", boxSizing:"border-box"}}
           onKeyDown={e => e.key === "Enter" && handleLogin()}/>
@@ -267,8 +264,14 @@ function LoginModal({onLogin, onClose}) {
 
 // App Component
 function App() {
+  const ADMIN_EMAILS = [
+    "palandjian@belmonthill.org",
+    "speer@belmonthill.org",
+    "markham@belmonthill.org"
+  ];
   const SUPABASE_URL = "https://uievqtckkotplvyfqshu.supabase.co";
   const SUPABASE_ANON_KEY = "sb_publishable_8YcUvmNO3QWfFqOnqMKcdg_y_-L2QRg";
+  const sb = React.useMemo(() => supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY), []);
   const sbRest = async (path, opts = {}) => {
     const headers = Object.assign({
       apikey: SUPABASE_ANON_KEY,
@@ -281,11 +284,13 @@ function App() {
   };
 
   const [tab, setTab] = React.useState("circuits");
-  const [admin, setAdmin] = React.useState(false);
+  const [user, setUser] = React.useState(null);
   const [showLogin, setShowLogin] = React.useState(false);
   const [drillTime, setDrillTime] = React.useState(90);
   const [isMobile, setIsMobile] = React.useState(window.innerWidth < 900);
   const [isSmall, setIsSmall] = React.useState(window.innerWidth < 768);
+  const [session, setSession] = React.useState(null);
+  const [sessionReady, setSessionReady] = React.useState(false);
 
   // Published plan state
   const [pubDrills, setPubDrills] = React.useState([]);
@@ -358,8 +363,43 @@ function App() {
         }
       })();
     }
-    if (sessionStorage.getItem("bh-admin")) setAdmin(true);
   }, []);
+
+  const admin = !!(user && ADMIN_EMAILS.includes((user.email || "").toLowerCase()));
+
+  // Auth state
+  React.useEffect(() => {
+    let active = true;
+    sb.auth.getSession().then(({ data }) => {
+      if (active) setUser(data && data.session ? data.session.user : null);
+    });
+    const { data: sub } = sb.auth.onAuthStateChange((_event, session) => {
+      setUser(session ? session.user : null);
+    });
+    return () => {
+      active = false;
+      if (sub && sub.subscription) sub.subscription.unsubscribe();
+    };
+  }, [sb]);
+
+  // Load circuit session + subscribe to realtime
+  React.useEffect(() => {
+    let channel = null;
+    const loadSession = async () => {
+      const { data, error } = await sb.from("circuit_session").select("*").eq("id", 1).single();
+      if (!error) setSession(data);
+      setSessionReady(true);
+    };
+    loadSession();
+    channel = sb.channel("circuit_session")
+      .on("postgres_changes", { event: "*", schema: "public", table: "circuit_session", filter: "id=eq.1" }, (payload) => {
+        if (payload.new) setSession(payload.new);
+      })
+      .subscribe();
+    return () => {
+      if (channel) sb.removeChannel(channel);
+    };
+  }, [sb]);
 
   // Track viewport for responsive layout
   React.useEffect(() => {
@@ -372,11 +412,23 @@ function App() {
   }, []);
 
   // Login/logout handlers
-  const handleLogin = () => { setShowLogin(false); setAdmin(true); sessionStorage.setItem("bh-admin","1"); };
-  const handleLogout = () => { setAdmin(false); sessionStorage.removeItem("bh-admin"); };
+  const handleLogin = async (email, password) => {
+    const { data, error } = await sb.auth.signInWithPassword({ email, password });
+    if (error || !data || !data.user) return false;
+    const isAllowed = ADMIN_EMAILS.includes((data.user.email || "").toLowerCase());
+    if (!isAllowed) {
+      await sb.auth.signOut();
+      return false;
+    }
+    setShowLogin(false);
+    return true;
+  };
+  const handleLogout = async () => {
+    await sb.auth.signOut();
+  };
 
   // Publish handler
-  const handlePublish = () => {
+  const handlePublish = async () => {
     const cfg = { drills: selDrills, exercises: selExercises, work, rest, rounds, drillTime };
     const doLocalPublish = () => {
       localStorage.setItem("bh-tennis-published", JSON.stringify(cfg));
@@ -388,22 +440,17 @@ function App() {
         setTimeout(() => setToast(""), 3000);
       });
     };
-    sbRest("published_plan", {
-      method: "POST",
-      headers: { Prefer: "resolution=merge-duplicates" },
-      body: JSON.stringify({ id: 1, data: cfg })
-    }).then(async (res) => {
-      if (!res.ok) {
-        doLocalPublish();
-        setToast("Published locally. Supabase write failed.");
-        setTimeout(() => setToast(""), 4000);
-        return;
-      }
-      setPubDrills(selDrills);
-      setPubExercises(selExercises);
-      setToast("Plan published for everyone!");
-      setTimeout(() => setToast(""), 3000);
-    });
+    const { error } = await sb.from("published_plan").upsert({ id: 1, data: cfg });
+    if (error) {
+      doLocalPublish();
+      setToast("Published locally. Supabase write failed.");
+      setTimeout(() => setToast(""), 4000);
+      return;
+    }
+    setPubDrills(selDrills);
+    setPubExercises(selExercises);
+    setToast("Plan published for everyone!");
+    setTimeout(() => setToast(""), 3000);
   };
 
   // Toggle drill selection (admin)
@@ -498,6 +545,44 @@ function App() {
 
   const circuitEquipment = summarizeEquipment(circuitExercises);
   const circuitEquipTotal = circuitEquipment.reduce((sum, item) => sum + (item.count || 0), 0);
+
+  // Global circuit session controls (admin)
+  const calcElapsed = () => {
+    if (!session || !session.start_time) return 0;
+    return Math.max(0, Math.floor((Date.now() - Date.parse(session.start_time)) / 1000));
+  };
+  const adminStart = async () => {
+    const stations = circuitExercises.map(e => e.id);
+    await sb.from("circuit_session").update({
+      status: "running",
+      start_time: new Date().toISOString(),
+      elapsed_at_pause: 0,
+      work,
+      rest,
+      rounds,
+      stations
+    }).eq("id", 1);
+  };
+  const adminPause = async () => {
+    await sb.from("circuit_session").update({
+      status: "paused",
+      elapsed_at_pause: calcElapsed()
+    }).eq("id", 1);
+  };
+  const adminResume = async () => {
+    const elapsed = session && session.elapsed_at_pause ? session.elapsed_at_pause : 0;
+    await sb.from("circuit_session").update({
+      status: "running",
+      start_time: new Date(Date.now() - elapsed * 1000).toISOString()
+    }).eq("id", 1);
+  };
+  const adminReset = async () => {
+    await sb.from("circuit_session").update({
+      status: "idle",
+      start_time: null,
+      elapsed_at_pause: 0
+    }).eq("id", 1);
+  };
 
   // Auto-select first circuit station when list changes
   React.useEffect(() => {
@@ -828,7 +913,13 @@ function App() {
                   {adminExercises.length > 0 && (
                     <div style={{marginTop:"16px"}}>
                       <CircuitTimer work={work} rest={rest} rounds={rounds} exercises={adminExercises}
-                        onStation={(i) => setCircuitStIdx(i)}/>
+                        onStation={(i) => setCircuitStIdx(i)}
+                        session={sessionReady ? session : null}
+                        isAdmin={admin}
+                        onAdminStart={adminStart}
+                        onAdminPause={adminPause}
+                        onAdminResume={adminResume}
+                        onAdminReset={adminReset}/>
                     </div>
                   )}
 
@@ -902,7 +993,13 @@ function App() {
                   {playerExercises.length > 0 && (
                     <div style={{marginTop:"16px"}}>
                       <CircuitTimer work={work} rest={rest} rounds={rounds} exercises={playerExercises}
-                        onStation={(i) => setCircuitStIdx(i)}/>
+                        onStation={(i) => setCircuitStIdx(i)}
+                        session={sessionReady ? session : null}
+                        isAdmin={false}
+                        onAdminStart={adminStart}
+                        onAdminPause={adminPause}
+                        onAdminResume={adminResume}
+                        onAdminReset={adminReset}/>
                     </div>
                   )}
 

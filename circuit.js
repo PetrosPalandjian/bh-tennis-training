@@ -140,40 +140,83 @@ function CircuitRing({stations, selectedIdx, onSelect, onRemove}) {
  * States: idle → station → rest → (loop) or done
  * Renders as a compact toolbar-style timer bar (~70px height)
  */
-function CircuitTimer({work, rest, rounds, exercises, onStation, onPhaseInfo}) {
+function CircuitTimer({work, rest, rounds, exercises, onStation, onPhaseInfo, session, isAdmin, onAdminStart, onAdminPause, onAdminResume, onAdminReset}) {
   const [phase, setPhase] = React.useState("idle");  // idle, station, rest, pausedStation, pausedRest, done
   const [time, setTime] = React.useState(0);
   const [stIdx, setStIdx] = React.useState(0);
   const [round, setRound] = React.useState(1);
   const timerRef = React.useRef(null);
+  const [nowTs, setNowTs] = React.useState(Date.now());
 
   const totalStations = exercises.length;
   const dur = phase === "station" || phase === "pausedStation" ? work : phase === "rest" || phase === "pausedRest" ? rest : 0;
+  const sessionMode = !!session;
 
-  // Reset everything when exercises change
+  function deriveFromSession() {
+    if (!session || totalStations <= 0 || rounds <= 0) {
+      return { phase: "idle", remaining: 0, round: 1, stIdx: 0 };
+    }
+    const status = session.status || "idle";
+    if (status === "idle" || !session.start_time) {
+      return { phase: "idle", remaining: 0, round: 1, stIdx: 0 };
+    }
+    const elapsed = status === "paused"
+      ? (session.elapsed_at_pause || 0)
+      : Math.max(0, Math.floor((nowTs - Date.parse(session.start_time)) / 1000));
+    const unit = work + rest;
+    const totalStationsAll = totalStations * rounds;
+    const totalDuration = totalStationsAll > 0 ? (totalStationsAll - 1) * unit + work : 0;
+    if (elapsed >= totalDuration) {
+      return { phase: "done", remaining: 0, round: rounds, stIdx: totalStations - 1 };
+    }
+    let blockIndex = 0;
+    let timeInBlock = elapsed;
+    if (totalStationsAll > 1) {
+      const lastStart = (totalStationsAll - 1) * unit;
+      if (elapsed >= lastStart) {
+        blockIndex = totalStationsAll - 1;
+        timeInBlock = elapsed - lastStart;
+      } else {
+        blockIndex = Math.floor(elapsed / unit);
+        timeInBlock = elapsed % unit;
+      }
+    }
+    const st = blockIndex % totalStations;
+    const rd = Math.floor(blockIndex / totalStations) + 1;
+    const isWork = timeInBlock < work;
+    const rem = isWork ? (work - timeInBlock) : (unit - timeInBlock);
+    let ph = isWork ? "station" : "rest";
+    if (status === "paused") ph = ph === "station" ? "pausedStation" : "pausedRest";
+    return { phase: ph, remaining: rem, round: rd, stIdx: st };
+  }
+
+  const derived = sessionMode ? deriveFromSession() : null;
+
+  // Reset everything when exercises change (local mode only)
   React.useEffect(() => {
+    if (sessionMode) return;
     if (timerRef.current) clearInterval(timerRef.current);
     timerRef.current = null;
     setPhase("idle");
     setTime(0);
     setStIdx(0);
     setRound(1);
-  }, [exercises.length]);
+  }, [exercises.length, sessionMode]);
 
   // Expose phase info to parent
   React.useEffect(() => {
     if (onPhaseInfo) {
       onPhaseInfo({
-        phase,
-        time,
-        round,
-        stIdx,
-        remaining: Math.max(0, dur - time),
+        phase: sessionMode ? derived.phase : phase,
+        time: sessionMode ? (dur - derived.remaining) : time,
+        round: sessionMode ? derived.round : round,
+        stIdx: sessionMode ? derived.stIdx : stIdx,
+        remaining: sessionMode ? derived.remaining : Math.max(0, dur - time),
         totalStations,
         rounds
       });
     }
-  }, [phase, time, round, stIdx, dur, totalStations, rounds, onPhaseInfo]);
+  }, [phase, time, round, stIdx, dur, totalStations, rounds, onPhaseInfo, sessionMode, derived]);
 
   const tick = React.useCallback(() => {
     setTime(t => {
@@ -228,15 +271,30 @@ function CircuitTimer({work, rest, rounds, exercises, onStation, onPhaseInfo}) {
     });
   }, [phase, dur, totalStations, rounds, onStation]);
 
-  // Run timer
+  // Run timer (local mode only)
   React.useEffect(() => {
+    if (sessionMode) return;
     if (phase === "station" || phase === "rest") {
       timerRef.current = setInterval(tick, 1000);
       return () => {
         if (timerRef.current) clearInterval(timerRef.current);
       };
     }
-  }, [phase, tick]);
+  }, [phase, tick, sessionMode]);
+
+  // Tick clock for session mode
+  React.useEffect(() => {
+    if (!sessionMode) return;
+    if (!session || session.status !== "running") return;
+    const t = setInterval(() => setNowTs(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [sessionMode, session && session.status]);
+
+  // Sync selection for session mode
+  React.useEffect(() => {
+    if (!sessionMode || !onStation || !derived) return;
+    onStation(derived.stIdx);
+  }, [sessionMode, derived && derived.stIdx, onStation]);
 
   function start() {
     setPhase("station");
@@ -267,10 +325,11 @@ function CircuitTimer({work, rest, rounds, exercises, onStation, onPhaseInfo}) {
     if (onStation) onStation(-1);
   }
 
-  const remaining = Math.max(0, dur - time);
-  const isRunning = phase === "station" || phase === "rest";
-  const isPaused = phase === "pausedStation" || phase === "pausedRest";
-  const isWork = phase === "station" || phase === "pausedStation";
+  const effectivePhase = sessionMode ? derived.phase : phase;
+  const remaining = sessionMode ? derived.remaining : Math.max(0, dur - time);
+  const isRunning = effectivePhase === "station" || effectivePhase === "rest";
+  const isPaused = effectivePhase === "pausedStation" || effectivePhase === "pausedRest";
+  const isWork = effectivePhase === "station" || effectivePhase === "pausedStation";
   const col = isWork ? BH.shotBlue : BH.shotGold;
 
   return (
@@ -289,12 +348,12 @@ function CircuitTimer({work, rest, rounds, exercises, onStation, onPhaseInfo}) {
       <div style={{
         fontSize: "42px",
         fontWeight: "bold",
-        color: phase === "idle" ? BH.g400 : col,
+        color: effectivePhase === "idle" ? BH.g400 : col,
         minWidth: "80px",
         textAlign: "center",
         fontVariantNumeric: "tabular-nums"
       }}>
-        {phase === "idle" ? "—" : phase === "done" ? "✓" : remaining}
+        {effectivePhase === "idle" ? "—" : effectivePhase === "done" ? "✓" : remaining}
       </div>
 
       {/* Divider */}
@@ -302,25 +361,27 @@ function CircuitTimer({work, rest, rounds, exercises, onStation, onPhaseInfo}) {
 
       {/* Phase label and info */}
       <div style={{flex: 1}}>
-        {phase === "idle" && (
-          <div style={{color: BH.g500, fontSize: "13px"}}>Ready to start</div>
+        {effectivePhase === "idle" && (
+          <div style={{color: BH.g500, fontSize: "13px"}}>
+            {isAdmin ? "Ready to start" : "Waiting for coach..."}
+          </div>
         )}
-        {phase === "done" && (
+        {effectivePhase === "done" && (
           <div style={{fontWeight: "bold", color: BH.maroon}}>CIRCUIT COMPLETE!</div>
         )}
-        {(phase === "station" || phase === "pausedStation") && (
+        {(effectivePhase === "station" || effectivePhase === "pausedStation") && (
           <>
             <div style={{fontWeight: "bold", color: BH.shotBlue, marginBottom: "2px"}}>WORK</div>
             <div style={{fontSize: "12px", color: BH.g500}}>
-              Round {round}/{rounds} • Station {stIdx + 1}/{totalStations}
+              Round {sessionMode ? derived.round : round}/{rounds} • Station {(sessionMode ? derived.stIdx : stIdx) + 1}/{totalStations}
             </div>
           </>
         )}
-        {(phase === "rest" || phase === "pausedRest") && (
+        {(effectivePhase === "rest" || effectivePhase === "pausedRest") && (
           <>
             <div style={{fontWeight: "bold", color: BH.shotGold, marginBottom: "2px"}}>REST</div>
             <div style={{fontSize: "12px", color: BH.g500}}>
-              Round {round}/{rounds} • Next: Station {(stIdx + 1) % totalStations + 1}
+              Round {sessionMode ? derived.round : round}/{rounds} • Next: Station {((sessionMode ? derived.stIdx : stIdx) + 1) % totalStations + 1}
             </div>
           </>
         )}
@@ -328,62 +389,66 @@ function CircuitTimer({work, rest, rounds, exercises, onStation, onPhaseInfo}) {
 
       {/* Control buttons */}
       <div style={{display: "flex", gap: "8px"}}>
-        {phase === "idle" && (
-          <button onClick={start} style={{
+        {effectivePhase === "idle" && (
+          <button onClick={sessionMode ? onAdminStart : start} disabled={sessionMode && !isAdmin} style={{
             padding: "8px 16px",
             background: BH.shotBlue,
             color: BH.white,
             border: "none",
             borderRadius: "4px",
-            cursor: "pointer",
+            cursor: sessionMode && !isAdmin ? "not-allowed" : "pointer",
             fontSize: "13px",
             fontWeight: "bold",
-            whiteSpace: "nowrap"
+            whiteSpace: "nowrap",
+            opacity: sessionMode && !isAdmin ? 0.5 : 1
           }}>
             START
           </button>
         )}
         {isRunning && (
-          <button onClick={pause} style={{
+          <button onClick={sessionMode ? onAdminPause : pause} disabled={sessionMode && !isAdmin} style={{
             padding: "8px 14px",
             background: BH.shotGold,
             color: BH.navy,
             border: "none",
             borderRadius: "4px",
-            cursor: "pointer",
+            cursor: sessionMode && !isAdmin ? "not-allowed" : "pointer",
             fontSize: "13px",
             fontWeight: "bold",
-            whiteSpace: "nowrap"
+            whiteSpace: "nowrap",
+            opacity: sessionMode && !isAdmin ? 0.5 : 1
           }}>
             PAUSE
           </button>
         )}
         {isPaused && (
-          <button onClick={resume} style={{
+          <button onClick={sessionMode ? onAdminResume : resume} disabled={sessionMode && !isAdmin} style={{
             padding: "8px 14px",
             background: BH.shotBlue,
             color: BH.white,
             border: "none",
             borderRadius: "4px",
-            cursor: "pointer",
+            cursor: sessionMode && !isAdmin ? "not-allowed" : "pointer",
             fontSize: "13px",
             fontWeight: "bold",
-            whiteSpace: "nowrap"
+            whiteSpace: "nowrap",
+            opacity: sessionMode && !isAdmin ? 0.5 : 1
           }}>
             RESUME
           </button>
         )}
-        {(isRunning || isPaused || phase === "done") && (
-          <button onClick={reset} style={{
+        {(isRunning || isPaused || effectivePhase === "done") && (
+          <button onClick={sessionMode ? onAdminReset : reset} disabled={sessionMode && !isAdmin} style={{
             padding: "8px 14px",
             background: BH.g400,
             color: BH.white,
             border: "none",
             borderRadius: "4px",
-            cursor: "pointer",
+            cursor: sessionMode && !isAdmin ? "not-allowed" : "pointer",
             fontSize: "13px",
             fontWeight: "bold",
-            whiteSpace: "nowrap"
+            whiteSpace: "nowrap",
+            opacity: sessionMode && !isAdmin ? 0.5 : 1
           }}>
             RESET
           </button>
