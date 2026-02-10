@@ -447,10 +447,10 @@ function App() {
   // Sync stretch durations from session
   React.useEffect(() => {
     if (!stretchSession) return;
-    if (typeof stretchSession.dyn_duration === "number") setDynStretchTime(stretchSession.dyn_duration);
-    if (typeof stretchSession.dyn_rest === "number") setDynStretchRest(stretchSession.dyn_rest);
-    if (typeof stretchSession.stat_duration === "number") setStatStretchTime(stretchSession.stat_duration);
-    if (typeof stretchSession.stat_rest === "number") setStatStretchRest(stretchSession.stat_rest);
+    if (typeof stretchSession.dyn_duration === "number") setDynStretchTime(Math.max(5, stretchSession.dyn_duration));
+    if (typeof stretchSession.dyn_rest === "number") setDynStretchRest(Math.max(0, stretchSession.dyn_rest));
+    if (typeof stretchSession.stat_duration === "number") setStatStretchTime(Math.max(5, stretchSession.stat_duration));
+    if (typeof stretchSession.stat_rest === "number") setStatStretchRest(Math.max(0, stretchSession.stat_rest));
   }, [stretchSession]);
 
   // Load config on mount
@@ -1393,37 +1393,9 @@ function App() {
                     ))}
                   </div>
 
-                  <div style={{background:BH.white, borderRadius:"8px", border:`2px solid ${BH.maroon}`,
-                               marginTop:"16px", overflow:"hidden"}}>
-                    <div style={{padding:"10px 14px", background:BH.maroon, color:BH.white,
-                                 fontSize:"13px", fontWeight:"bold"}}>
-                      Today's Stretches ({selStretches.length})
-                    </div>
-                    <div style={{padding:"8px 14px", maxHeight:"150px", overflowY:"auto"}}>
-                      {selStretches.length === 0 ? (
-                        <div style={{fontSize:"12px", color:BH.g500, padding:"8px 0"}}>
-                          Check stretches above to build today's plan
-                        </div>
-                      ) : (
-                        selStretches.map((id, i) => {
-                          const s = STRETCHES.find(st => st.id === id);
-                          if (!s) return null;
-                          return (
-                            <div key={id} style={{display:"flex", gap:"8px", alignItems:"center", padding:"3px 0"}}>
-                              <span style={{fontSize:"11px", fontWeight:"bold", color:BH.maroon, minWidth:"18px"}}>{i+1}.</span>
-                              <span style={{fontSize:"12px", color:BH.navy}}>{s.name}</span>
-                              <button onClick={(ev) => { ev.stopPropagation(); toggleStretch(id); }} style={{marginLeft:"auto", background:"none",
-                                border:"none", cursor:"pointer", fontSize:"14px", color:BH.g400}}>×</button>
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
-                  </div>
-
-                  <div style={{background:BH.white, borderRadius:"8px", border:`2px solid ${BH.shotBlue}`,
+                  <div style={{background:BH.white, borderRadius:"8px", border:`2px solid ${BH.navy}`,
                                marginTop:"12px", overflow:"hidden"}}>
-                    <div style={{padding:"10px 14px", background:BH.shotBlue, color:BH.white,
+                    <div style={{padding:"10px 14px", background:BH.navy, color:BH.white,
                                  fontSize:"13px", fontWeight:"bold"}}>
                       Today's Dynamic Stretches ({dynamicList.length})
                     </div>
@@ -1435,7 +1407,7 @@ function App() {
                       ) : (
                         dynamicList.map((s, i) => (
                           <div key={s.id} style={{display:"flex", gap:"8px", alignItems:"center", padding:"3px 0"}}>
-                            <span style={{fontSize:"11px", fontWeight:"bold", color:BH.shotBlue, minWidth:"18px"}}>{i+1}.</span>
+                            <span style={{fontSize:"11px", fontWeight:"bold", color:BH.navy, minWidth:"18px"}}>{i+1}.</span>
                             <span style={{fontSize:"12px", color:BH.navy}}>{s.name}</span>
                             <button onClick={(ev) => { ev.stopPropagation(); toggleStretch(s.id); }} style={{marginLeft:"auto", background:"none",
                               border:"none", cursor:"pointer", fontSize:"14px", color:BH.g400}}>×</button>
@@ -1505,56 +1477,6 @@ function App() {
                   Dynamic before hitting. Static after practice. Breathe and never force the range.
                 </div>
               </div>
-              {admin ? (
-                <div style={{background:BH.white, borderRadius:"8px", border:`1px solid ${BH.g300}`, padding:"12px 14px", marginTop:"12px"}}>
-                  <div style={{fontSize:"12px", fontWeight:"bold", color:BH.navy, marginBottom:"8px"}}>Timer Settings</div>
-                  <div style={{display:"flex", flexDirection:"column", gap:"8px"}}>
-                    <label style={{fontSize:"12px", color:BH.g700, display:"flex", justifyContent:"space-between", alignItems:"center"}}>
-                      Dynamic Stretch (sec)
-                      <input type="number" value={dynStretchTime} onChange={e => {
-                        const v = Math.max(5, +e.target.value || 0);
-                        setDynStretchTime(v);
-                        if (sb) updateStretchSettings(v, dynStretchRest, statStretchTime, statStretchRest);
-                      }}
-                        style={{width:"70px", padding:"4px 8px", border:`1px solid ${BH.g300}`, borderRadius:"4px"}} min="5" max="1800"/>
-                    </label>
-                    <label style={{fontSize:"12px", color:BH.g700, display:"flex", justifyContent:"space-between", alignItems:"center"}}>
-                      Dynamic Rest (sec)
-                      <input type="number" value={dynStretchRest} onChange={e => {
-                        const v = Math.max(0, +e.target.value || 0);
-                        setDynStretchRest(v);
-                        if (sb) updateStretchSettings(dynStretchTime, v, statStretchTime, statStretchRest);
-                      }}
-                        style={{width:"70px", padding:"4px 8px", border:`1px solid ${BH.g300}`, borderRadius:"4px"}} min="0" max="300"/>
-                    </label>
-                    <label style={{fontSize:"12px", color:BH.g700, display:"flex", justifyContent:"space-between", alignItems:"center"}}>
-                      Static Stretch (sec)
-                      <input type="number" value={statStretchTime} onChange={e => {
-                        const v = Math.max(5, +e.target.value || 0);
-                        setStatStretchTime(v);
-                        if (sb) updateStretchSettings(dynStretchTime, dynStretchRest, v, statStretchRest);
-                      }}
-                        style={{width:"70px", padding:"4px 8px", border:`1px solid ${BH.g300}`, borderRadius:"4px"}} min="5" max="1800"/>
-                    </label>
-                    <label style={{fontSize:"12px", color:BH.g700, display:"flex", justifyContent:"space-between", alignItems:"center"}}>
-                      Static Rest (sec)
-                      <input type="number" value={statStretchRest} onChange={e => {
-                        const v = Math.max(0, +e.target.value || 0);
-                        setStatStretchRest(v);
-                        if (sb) updateStretchSettings(dynStretchTime, dynStretchRest, statStretchTime, v);
-                      }}
-                        style={{width:"70px", padding:"4px 8px", border:`1px solid ${BH.g300}`, borderRadius:"4px"}} min="0" max="300"/>
-                    </label>
-                  </div>
-                </div>
-              ) : (
-                <div style={{background:BH.white, borderRadius:"8px", border:`1px solid ${BH.g300}`, padding:"12px 14px", marginTop:"12px"}}>
-                  <div style={{fontSize:"12px", fontWeight:"bold", color:BH.navy, marginBottom:"6px"}}>Timer Settings</div>
-                  <div style={{fontSize:"12px", color:BH.g700}}>
-                    Dynamic: {dynStretchTime}s + {dynStretchRest}s rest • Static: {statStretchTime}s + {statStretchRest}s rest
-                  </div>
-                </div>
-              )}
             </div>
             <div style={{flex:1, minWidth:0}}>
               {displayStretches.length === 0 ? (
@@ -1563,52 +1485,104 @@ function App() {
                 </div>
               ) : (
                 <>
-                  <div style={{display:"flex", gap:"10px", flexWrap:"wrap", marginBottom:"10px"}}>
-                    <div style={{flex:1, minWidth:"220px"}}>
-                      <StretchTimer
-                        label="Dynamic Timer"
-                        color={BH.shotBlue}
-                        session={stretchReady ? stretchSession : null}
-                        kind="dyn"
-                        isAdmin={admin}
-                        onAdminStart={() => adminStretchStart("dyn")}
-                        onAdminPause={() => adminStretchPause("dyn")}
-                        onAdminResume={() => adminStretchResume("dyn")}
-                        onAdminReset={() => adminStretchReset("dyn")}
-                        list={dynamicList}
-                        work={dynStretchTime}
-                        rest={dynStretchRest}
-                      />
+                  <div style={{display:"grid", gridTemplateColumns:isSmall ? "1fr" : "1.2fr 0.8fr", gap:"12px", marginBottom:"10px"}}>
+                    <div style={{display:"flex", gap:"10px", flexWrap:"wrap"}}>
+                      <div style={{flex:1, minWidth:"220px"}}>
+                        <StretchTimer
+                          label="Dynamic Timer"
+                          color={BH.navy}
+                          session={stretchReady ? stretchSession : null}
+                          kind="dyn"
+                          isAdmin={admin}
+                          onAdminStart={() => adminStretchStart("dyn")}
+                          onAdminPause={() => adminStretchPause("dyn")}
+                          onAdminResume={() => adminStretchResume("dyn")}
+                          onAdminReset={() => adminStretchReset("dyn")}
+                          list={dynamicList}
+                          work={dynStretchTime}
+                          rest={dynStretchRest}
+                        />
+                      </div>
+                      <div style={{flex:1, minWidth:"220px"}}>
+                        <StretchTimer
+                          label="Static Timer"
+                          color={BH.maroon}
+                          session={stretchReady ? stretchSession : null}
+                          kind="stat"
+                          isAdmin={admin}
+                          onAdminStart={() => adminStretchStart("stat")}
+                          onAdminPause={() => adminStretchPause("stat")}
+                          onAdminResume={() => adminStretchResume("stat")}
+                          onAdminReset={() => adminStretchReset("stat")}
+                          list={staticList}
+                          work={statStretchTime}
+                          rest={statStretchRest}
+                        />
+                      </div>
                     </div>
-                    <div style={{flex:1, minWidth:"220px"}}>
-                      <StretchTimer
-                        label="Static Timer"
-                        color={BH.maroon}
-                        session={stretchReady ? stretchSession : null}
-                        kind="stat"
-                        isAdmin={admin}
-                        onAdminStart={() => adminStretchStart("stat")}
-                        onAdminPause={() => adminStretchPause("stat")}
-                        onAdminResume={() => adminStretchResume("stat")}
-                        onAdminReset={() => adminStretchReset("stat")}
-                        list={staticList}
-                        work={statStretchTime}
-                        rest={statStretchRest}
-                      />
-                    </div>
+                    {admin ? (
+                      <div style={{background:BH.white, borderRadius:"8px", border:`1px solid ${BH.g300}`, padding:"12px 14px"}}>
+                        <div style={{fontSize:"12px", fontWeight:"bold", color:BH.navy, marginBottom:"8px"}}>Timer Settings</div>
+                        <div style={{display:"flex", flexDirection:"column", gap:"8px"}}>
+                          <label style={{fontSize:"12px", color:BH.g700, display:"flex", justifyContent:"space-between", alignItems:"center"}}>
+                            Dynamic Stretch (sec)
+                            <input type="number" value={dynStretchTime} onChange={e => {
+                              const v = Math.max(5, +e.target.value || 0);
+                              setDynStretchTime(v);
+                              if (sb) updateStretchSettings(v, dynStretchRest, statStretchTime, statStretchRest);
+                            }}
+                              style={{width:"70px", padding:"4px 8px", border:`1px solid ${BH.g300}`, borderRadius:"4px"}} min="5" max="1800"/>
+                          </label>
+                          <label style={{fontSize:"12px", color:BH.g700, display:"flex", justifyContent:"space-between", alignItems:"center"}}>
+                            Dynamic Rest (sec)
+                            <input type="number" value={dynStretchRest} onChange={e => {
+                              const v = Math.max(0, +e.target.value || 0);
+                              setDynStretchRest(v);
+                              if (sb) updateStretchSettings(dynStretchTime, v, statStretchTime, statStretchRest);
+                            }}
+                              style={{width:"70px", padding:"4px 8px", border:`1px solid ${BH.g300}`, borderRadius:"4px"}} min="0" max="300"/>
+                          </label>
+                          <label style={{fontSize:"12px", color:BH.g700, display:"flex", justifyContent:"space-between", alignItems:"center"}}>
+                            Static Stretch (sec)
+                            <input type="number" value={statStretchTime} onChange={e => {
+                              const v = Math.max(5, +e.target.value || 0);
+                              setStatStretchTime(v);
+                              if (sb) updateStretchSettings(dynStretchTime, dynStretchRest, v, statStretchRest);
+                            }}
+                              style={{width:"70px", padding:"4px 8px", border:`1px solid ${BH.g300}`, borderRadius:"4px"}} min="5" max="1800"/>
+                          </label>
+                          <label style={{fontSize:"12px", color:BH.g700, display:"flex", justifyContent:"space-between", alignItems:"center"}}>
+                            Static Rest (sec)
+                            <input type="number" value={statStretchRest} onChange={e => {
+                              const v = Math.max(0, +e.target.value || 0);
+                              setStatStretchRest(v);
+                              if (sb) updateStretchSettings(dynStretchTime, dynStretchRest, statStretchTime, v);
+                            }}
+                              style={{width:"70px", padding:"4px 8px", border:`1px solid ${BH.g300}`, borderRadius:"4px"}} min="0" max="300"/>
+                          </label>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{background:BH.white, borderRadius:"8px", border:`1px solid ${BH.g300}`, padding:"12px 14px"}}>
+                        <div style={{fontSize:"12px", fontWeight:"bold", color:BH.navy, marginBottom:"6px"}}>Timer Settings</div>
+                        <div style={{fontSize:"12px", color:BH.g700}}>
+                          Dynamic: {dynStretchTime}s + {dynStretchRest}s rest • Static: {statStretchTime}s + {statStretchRest}s rest
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <div style={{display:"grid", gridTemplateColumns:isSmall ? "1fr" : "1fr 1fr", gap:"14px"}}>
                     <div>
                       <div style={{fontSize:"13px", fontWeight:"bold", color:BH.navy, margin:"4px 0 10px"}}>Pre-Practice</div>
                       <div style={{background:BH.white, borderRadius:"8px", border:`1px solid ${BH.g300}`}}>
                         {dynamicList.length === 0 ? (
-                          <div style={{padding:"16px", fontSize:"12px", color:BH.g500}}>No dynamic stretches selected.</div>
+                        <div style={{padding:"16px", fontSize:"12px", color:BH.g500}}>No dynamic stretches selected.</div>
                         ) : (
                           dynamicList.map((s, i) => (
                             <div key={s.id} style={{padding:"10px 14px", borderBottom:`1px solid ${BH.g100}`}}>
                               <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", gap:"10px"}}>
                                 <div style={{fontSize:"13px", fontWeight:"bold", color:BH.navy}}>{i+1}. {s.name}</div>
-                                <span style={{fontSize:"10px", color:BH.white, background:BH.shotBlue, padding:"3px 8px",
+                                <span style={{fontSize:"10px", color:BH.white, background:BH.navy, padding:"3px 8px",
                                   borderRadius:"999px", fontWeight:"bold", letterSpacing:"0.3px"}}>Dynamic</span>
                               </div>
                               <div style={{fontSize:"11px", color:BH.g700, marginTop:"4px"}}>{s.desc}</div>
