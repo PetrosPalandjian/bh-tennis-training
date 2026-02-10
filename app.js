@@ -477,6 +477,7 @@ function App() {
   const [viewDrill, setViewDrill] = React.useState(null);
   const [toast, setToast] = React.useState("");
   const [circuitStIdx, setCircuitStIdx] = React.useState(-1);
+  const [stretchTick, setStretchTick] = React.useState(0);
 
   // Sync stretch durations from session
   React.useEffect(() => {
@@ -486,6 +487,16 @@ function App() {
     if (typeof stretchSession.stat_duration === "number") setStatStretchTime(Math.max(5, stretchSession.stat_duration));
     if (typeof stretchSession.stat_rest === "number") setStatStretchRest(Math.max(0, stretchSession.stat_rest));
   }, [stretchSession]);
+
+  // Tick while any stretch timer is running so highlights stay in sync
+  React.useEffect(() => {
+    if (!stretchSession) return;
+    const dynRunning = stretchSession.dyn_status === "running";
+    const statRunning = stretchSession.stat_status === "running";
+    if (!dynRunning && !statRunning) return;
+    const t = setInterval(() => setStretchTick(v => v + 1), 1000);
+    return () => clearInterval(t);
+  }, [stretchSession && stretchSession.dyn_status, stretchSession && stretchSession.stat_status, stretchSession && stretchSession.dyn_start_time, stretchSession && stretchSession.stat_start_time]);
 
   // Load config on mount
   React.useEffect(() => {
@@ -735,6 +746,39 @@ function App() {
   const dynamicList = stretchList.filter(s => s.type === "Dynamic");
   const staticList = stretchList.filter(s => s.type === "Static");
   const displayStretches = stretchList;
+  const _stretchTick = stretchTick;
+
+  const getStretchElapsed = (kind) => {
+    if (!stretchSession) return 0;
+    const status = stretchSession[`${kind}_status`];
+    if (status === "paused") return stretchSession[`${kind}_elapsed_at_pause`] || 0;
+    if (status !== "running") return 0;
+    const start = stretchSession[`${kind}_start_time`];
+    if (!start) return 0;
+    return Math.max(0, Math.floor((Date.now() - Date.parse(start)) / 1000));
+  };
+  const getStretchProgress = (kind, list, work, rest) => {
+    const safeList = Array.isArray(list) ? list.filter(Boolean) : [];
+    const count = safeList.length;
+    const safeWork = Math.max(5, Number(work) || 0);
+    const safeRest = Math.max(0, Number(rest) || 0);
+    if (count === 0) return { idx: -1, phase: "idle" };
+    const per = safeWork + safeRest;
+    const total = count * safeWork + Math.max(0, count - 1) * safeRest;
+    const elapsed = Math.min(getStretchElapsed(kind), total);
+    if (elapsed >= total) return { idx: count - 1, phase: "done" };
+    const idx = Math.min(count - 1, Math.floor(elapsed / per));
+    const cycleStart = idx * per;
+    const cyclePos = Math.max(0, elapsed - cycleStart);
+    if (idx === count - 1) {
+      if (cyclePos < safeWork) return { idx, phase: "stretch" };
+      return { idx, phase: "done" };
+    }
+    if (cyclePos < safeWork) return { idx, phase: "stretch" };
+    return { idx, phase: "rest" };
+  };
+  const dynProgress = getStretchProgress("dyn", dynamicList, dynStretchTime, dynStretchRest);
+  const statProgress = getStretchProgress("stat", staticList, statStretchTime, statStretchRest);
 
   // Equipment summary for circuit exercises
   const summarizeEquipment = (items) => {
@@ -1592,17 +1636,24 @@ function App() {
                         {dynamicList.length === 0 ? (
                         <div style={{padding:"16px", fontSize:"12px", color:BH.g500}}>No dynamic stretches selected.</div>
                         ) : (
-                          dynamicList.map((s, i) => (
-                            <div key={s.id} style={{padding:"10px 14px", borderBottom:`1px solid ${BH.g100}`}}>
-                              <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", gap:"10px"}}>
-                                <div style={{fontSize:"13px", fontWeight:"bold", color:BH.navy}}>{i+1}. {s.name}</div>
-                                <span style={{fontSize:"10px", color:BH.white, background:BH.navy, padding:"3px 8px",
-                                  borderRadius:"999px", fontWeight:"bold", letterSpacing:"0.3px"}}>Dynamic</span>
-                              </div>
-                              <div style={{fontSize:"11px", color:BH.g700, marginTop:"4px"}}>{s.desc}</div>
-                              <div style={{fontSize:"11px", color:BH.g500, marginTop:"4px"}}>{s.area} • {s.reps}</div>
+                        dynamicList.map((s, i) => {
+                          const isActive = i === dynProgress.idx && dynProgress.phase === "stretch";
+                          return (
+                          <div key={s.id} style={{
+                            padding:"10px 14px",
+                            borderBottom:`1px solid ${BH.g100}`,
+                            background: isActive ? "rgba(27,54,93,0.08)" : "transparent"
+                          }}>
+                            <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", gap:"10px"}}>
+                              <div style={{fontSize:"13px", fontWeight:"bold", color:BH.navy}}>{i+1}. {s.name}</div>
+                              <span style={{fontSize:"10px", color:BH.white, background:BH.navy, padding:"3px 8px",
+                                borderRadius:"999px", fontWeight:"bold", letterSpacing:"0.3px"}}>Dynamic</span>
                             </div>
-                          ))
+                            <div style={{fontSize:"11px", color:BH.g700, marginTop:"4px"}}>{s.desc}</div>
+                            <div style={{fontSize:"11px", color:BH.g500, marginTop:"4px"}}>{s.area} • {s.reps}</div>
+                          </div>
+                        );
+                        })
                         )}
                       </div>
                     </div>
@@ -1612,17 +1663,24 @@ function App() {
                         {staticList.length === 0 ? (
                           <div style={{padding:"16px", fontSize:"12px", color:BH.g500}}>No static stretches selected.</div>
                         ) : (
-                          staticList.map((s, i) => (
-                            <div key={s.id} style={{padding:"10px 14px", borderBottom:`1px solid ${BH.g100}`}}>
-                              <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", gap:"10px"}}>
-                                <div style={{fontSize:"13px", fontWeight:"bold", color:BH.navy}}>{i+1}. {s.name}</div>
-                                <span style={{fontSize:"10px", color:BH.white, background:BH.maroon, padding:"3px 8px",
-                                  borderRadius:"999px", fontWeight:"bold", letterSpacing:"0.3px"}}>Static</span>
-                              </div>
-                              <div style={{fontSize:"11px", color:BH.g700, marginTop:"4px"}}>{s.desc}</div>
-                              <div style={{fontSize:"11px", color:BH.g500, marginTop:"4px"}}>{s.area} • {s.reps}</div>
+                        staticList.map((s, i) => {
+                          const isActive = i === statProgress.idx && statProgress.phase === "stretch";
+                          return (
+                          <div key={s.id} style={{
+                            padding:"10px 14px",
+                            borderBottom:`1px solid ${BH.g100}`,
+                            background: isActive ? "rgba(122,28,42,0.08)" : "transparent"
+                          }}>
+                            <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", gap:"10px"}}>
+                              <div style={{fontSize:"13px", fontWeight:"bold", color:BH.navy}}>{i+1}. {s.name}</div>
+                              <span style={{fontSize:"10px", color:BH.white, background:BH.maroon, padding:"3px 8px",
+                                borderRadius:"999px", fontWeight:"bold", letterSpacing:"0.3px"}}>Static</span>
                             </div>
-                          ))
+                            <div style={{fontSize:"11px", color:BH.g700, marginTop:"4px"}}>{s.desc}</div>
+                            <div style={{fontSize:"11px", color:BH.g500, marginTop:"4px"}}>{s.area} • {s.reps}</div>
+                          </div>
+                        );
+                        })
                         )}
                       </div>
                     </div>

@@ -30,8 +30,6 @@ const snd={
   done:()=>{beep(523,120);setTimeout(()=>beep(659,120),160);setTimeout(()=>beep(784,120),320);setTimeout(()=>beep(1047,350),480)},
 };
 
-async function sha256(msg){const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(msg));return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');}
-
 const EXERCISES=[
   {id:"russian-twist",name:"Russian Twists",cat:"Core",desc:"Sit tall, lean back slightly, rotate through your ribs, and keep the legs quiet. Control every rep.",reps:"20 reps",equip:"Med Ball 8-12lb",youtubeId:"LlccOWys8IU"},
   {id:"plank",name:"Plank Hold",cat:"Core",desc:"Elbows under shoulders, glutes tight, ribs down. Hold a straight line head-to-heels.",reps:"45 sec",equip:"None",youtubeId:"UQ78pw0WNZI",youtubeStart:0,youtubeEnd:15},
