@@ -300,6 +300,8 @@ function StretchTimer({
 }) {
   const [tick, setTick] = React.useState(0);
   const tmr = React.useRef(null);
+  const cueRef = React.useRef({ phase: null, idx: -1 });
+  const countdownRef = React.useRef("");
 
   const getStatus = () => session ? session[`${kind}_status`] : "idle";
   const getStart = () => session ? session[`${kind}_start_time`] : null;
@@ -384,6 +386,50 @@ function StretchTimer({
   const startLabel = status === "running" ? "Pause" : status === "paused" ? "Resume" : "Start";
   const sub = phase === "rest" ? `Rest ${safeRest}s` : phase === "done" ? "Done" : `Stretch ${safeWork}s`;
   const statusText = status === "running" ? "Coach is running the timer" : status === "paused" ? "Paused by coach" : "Waiting for coach...";
+  const speak = React.useCallback((text, replaceQueue = false) => {
+    if (!text || typeof window === "undefined" || !window.speechSynthesis) return;
+    try {
+      if (replaceQueue) window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.rate = 1.0;
+      u.pitch = 1.0;
+      window.speechSynthesis.speak(u);
+    } catch (e) {}
+  }, []);
+
+  React.useEffect(() => {
+    if (status !== "running") {
+      countdownRef.current = "";
+      cueRef.current = { phase: null, idx: -1 };
+      return;
+    }
+    let announcedCue = false;
+    const cueKey = `${phase}:${idx}`;
+    const prevKey = `${cueRef.current.phase}:${cueRef.current.idx}`;
+    if ((phase === "stretch" || phase === "rest") && cueKey !== prevKey) {
+      if (phase === "stretch" && idx >= 0 && safeList[idx]) {
+        speak(`Start. ${safeList[idx].name}.`, true);
+        announcedCue = true;
+      } else if (phase === "rest") {
+        const nextName = (idx + 1 < count && safeList[idx + 1]) ? safeList[idx + 1].name : "";
+        speak(nextName ? `Rest. Get ready for ${nextName}.` : "Rest.", true);
+        announcedCue = true;
+      }
+      cueRef.current = { phase, idx };
+      countdownRef.current = "";
+    }
+
+    if (!announcedCue && (phase === "stretch" || phase === "rest") && timeLeft <= 5 && timeLeft >= 1) {
+      const n = Math.ceil(timeLeft);
+      const cKey = `${phase}:${idx}:${n}`;
+      if (countdownRef.current !== cKey) {
+        speak(String(n), true);
+        countdownRef.current = cKey;
+      }
+    } else if (timeLeft > 5 || phase === "done" || phase === "idle") {
+      countdownRef.current = "";
+    }
+  }, [status, phase, idx, timeLeft, count, safeList, speak]);
 
   return (
     <div style={{background:BH.white, border:`1px solid ${BH.g300}`, borderRadius:"8px", padding:"12px 14px"}}>
