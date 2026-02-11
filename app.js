@@ -604,7 +604,16 @@ function App() {
   const [statStretchRest, setStatStretchRest] = React.useState(5);
   const [viewDrill, setViewDrill] = React.useState(null);
   const [toast, setToast] = React.useState("");
-  const [circuitStIdx, setCircuitStIdx] = React.useState(-1);
+  const [circuitGlobalIdx, setCircuitGlobalIdx] = React.useState(-1);
+  const [circuitStartStation, setCircuitStartStation] = React.useState(() => {
+    try {
+      const raw = localStorage.getItem("bh-circuit-start-station");
+      const n = Number(raw);
+      return Number.isFinite(n) && n >= 1 ? Math.floor(n) : 1;
+    } catch (e) {
+      return 1;
+    }
+  });
   const [, setStretchTick] = React.useState(0);
   const [circuitManualUntil, setCircuitManualUntil] = React.useState(0);
   const normalizeDrills = React.useCallback((drills, defaultTime) => {
@@ -952,6 +961,21 @@ function App() {
 
   // Circuit exercises to display
   const circuitExercises = admin ? adminExercises : playerExercises;
+  const stationCount = circuitExercises.length;
+  const clampedStartStation = stationCount > 0 ? Math.min(Math.max(1, circuitStartStation), stationCount) : 1;
+  const stationOffset = stationCount > 0 ? (clampedStartStation - 1) : 0;
+  const toDisplayStationIdx = React.useCallback((globalIdx) => {
+    if (globalIdx == null || globalIdx < 0 || stationCount <= 0) return -1;
+    return (globalIdx + stationOffset) % stationCount;
+  }, [stationCount, stationOffset]);
+  const toGlobalStationIdx = React.useCallback((displayIdx) => {
+    if (displayIdx == null || displayIdx < 0 || stationCount <= 0) return -1;
+    return (displayIdx - stationOffset + stationCount) % stationCount;
+  }, [stationCount, stationOffset]);
+  const circuitStIdx = toDisplayStationIdx(circuitGlobalIdx);
+  const setCircuitStIdx = React.useCallback((displayIdx) => {
+    setCircuitGlobalIdx(toGlobalStationIdx(displayIdx));
+  }, [toGlobalStationIdx]);
   const stretchList = admin ? adminStretches : playerStretches;
   const dynamicList = stretchList.filter(s => s.type === "Dynamic");
   const staticList = stretchList.filter(s => s.type === "Static");
@@ -1040,6 +1064,17 @@ function App() {
 
   const circuitEquipment = summarizeEquipment(circuitExercises);
   const circuitEquipTotal = circuitEquipment.reduce((sum, item) => sum + (item.count || 0), 0);
+
+  React.useEffect(() => {
+    if (stationCount <= 0) return;
+    setCircuitStartStation(prev => Math.min(Math.max(1, prev), stationCount));
+  }, [stationCount]);
+
+  React.useEffect(() => {
+    try {
+      localStorage.setItem("bh-circuit-start-station", String(circuitStartStation));
+    } catch (e) {}
+  }, [circuitStartStation]);
 
   // Global circuit session controls (admin)
   const calcElapsed = () => {
@@ -1223,10 +1258,10 @@ function App() {
 
   // Auto-select first circuit station when list changes
   React.useEffect(() => {
-    if (circuitExercises.length > 0 && (circuitStIdx < 0 || circuitStIdx >= circuitExercises.length)) {
-      setCircuitStIdx(0);
+    if (circuitExercises.length > 0 && (circuitGlobalIdx < 0 || circuitGlobalIdx >= circuitExercises.length)) {
+      setCircuitGlobalIdx(0);
     }
-  }, [circuitExercises.length]);
+  }, [circuitExercises.length, circuitGlobalIdx]);
 
   // Keep drill selection valid as published/admin lists change
   React.useEffect(() => {
@@ -1241,8 +1276,10 @@ function App() {
 
   // Button style helpers
   const tabBtn = (active) => ({
-    padding:"10px 24px", background:active?BH.navy:BH.g200, color:active?BH.white:BH.navy,
-    border:"none", borderRadius:"6px", cursor:"pointer", fontWeight:"bold", fontSize:"14px"
+    padding:isSmall ? "8px 10px" : "10px 24px",
+    background:active?BH.navy:BH.g200, color:active?BH.white:BH.navy,
+    border:"none", borderRadius:"6px", cursor:"pointer", fontWeight:"bold",
+    fontSize:isSmall ? "12px" : "14px", whiteSpace:"nowrap"
   });
 
   const catBtn = (active) => ({
@@ -1285,7 +1322,8 @@ function App() {
       </header>
 
       {/* Tab bar */}
-      <div style={{display:"flex", justifyContent:"center", gap:"12px", padding:"16px",
+      <div style={{display:"flex", justifyContent:"center", gap:isSmall ? "8px" : "12px", padding:isSmall ? "10px 8px" : "16px",
+                   flexWrap:"wrap",
                    background:BH.white, borderBottom:`1px solid ${BH.g300}`}}>
         <button onClick={() => { setTab("circuits"); }} style={tabBtn(tab==="circuits")}>
           Circuits
@@ -1563,7 +1601,7 @@ function App() {
                   {adminExercises.length > 0 && (
                     <div style={{marginTop:"16px"}}>
                       <CircuitTimer work={work} rest={rest} rounds={rounds} exercises={adminExercises}
-                        onStation={(i) => { if (Date.now() > circuitManualUntil) setCircuitStIdx(i); }}
+                        onStation={(i) => { if (Date.now() > circuitManualUntil) setCircuitGlobalIdx(i); }}
                         session={sessionReady ? session : null}
                         isAdmin={admin}
                         onAdminStart={adminStart}
@@ -1643,7 +1681,7 @@ function App() {
                   {playerExercises.length > 0 && (
                     <div style={{marginTop:"16px"}}>
                       <CircuitTimer work={work} rest={rest} rounds={rounds} exercises={playerExercises}
-                        onStation={(i) => { if (Date.now() > circuitManualUntil) setCircuitStIdx(i); }}
+                        onStation={(i) => { if (Date.now() > circuitManualUntil) setCircuitGlobalIdx(i); }}
                         session={sessionReady ? session : null}
                         isAdmin={false}
                         onAdminStart={adminStart}
@@ -1685,6 +1723,20 @@ function App() {
 
             {/* Right: Circuit Ring + Timer */}
             <div style={{flex:1, minWidth:0}}>
+              {circuitExercises.length > 0 && (
+                <div style={{background:BH.white, borderRadius:"8px", border:`1px solid ${BH.g300}`, padding:"10px 12px", marginBottom:"12px",
+                             display:"flex", alignItems:"center", gap:"8px", flexWrap:"wrap"}}>
+                  <div style={{fontSize:"12px", fontWeight:"bold", color:BH.navy}}>My Start Station</div>
+                  <select
+                    value={clampedStartStation}
+                    onChange={(e) => setCircuitStartStation(Math.max(1, Number(e.target.value) || 1))}
+                    style={{padding:"6px 8px", border:`1px solid ${BH.g300}`, borderRadius:"6px", fontSize:"12px", color:BH.navy}}>
+                    {Array.from({ length: stationCount }, (_, i) => i + 1).map(n => (
+                      <option key={n} value={n}>Station {n}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               {circuitExercises.length === 0 ? (
                 <div style={{textAlign:"center", padding:"60px 20px", color:BH.g500}}>
                   {admin ? "Select exercises from the left to build your circuit" : "No circuit published yet."}
