@@ -543,7 +543,7 @@ function App() {
   const [viewDrill, setViewDrill] = React.useState(null);
   const [toast, setToast] = React.useState("");
   const [circuitStIdx, setCircuitStIdx] = React.useState(-1);
-  const [stretchTick, setStretchTick] = React.useState(0);
+  const [, setStretchTick] = React.useState(0);
   const [circuitManualUntil, setCircuitManualUntil] = React.useState(0);
   const normalizeDrills = React.useCallback((drills, defaultTime) => {
     if (!Array.isArray(drills) || drills.length === 0) return [];
@@ -894,8 +894,6 @@ function App() {
   const stretchList = admin ? adminStretches : playerStretches;
   const dynamicList = stretchList.filter(s => s.type === "Dynamic");
   const staticList = stretchList.filter(s => s.type === "Static");
-  const displayStretches = stretchList;
-  const _stretchTick = stretchTick;
 
   const getStretchElapsed = (kind) => {
     if (!stretchSession) return 0;
@@ -1772,7 +1770,7 @@ function App() {
                   </div>
                 </div>
               )}
-              {displayStretches.length === 0 ? (
+              {stretchList.length === 0 ? (
                 <div style={{textAlign:"center", padding:"60px 20px", color:BH.g500}}>
                   {admin ? "No stretches selected yet." : "Waiting for coach..."}
                 </div>
