@@ -1763,6 +1763,7 @@ function StretchTimer({
   const canAdmin = isAdmin && !!session;
   const startLabel = status === "running" ? "Pause" : status === "paused" ? "Resume" : "Start";
   const sub = phase === "rest" ? `Rest ${safeRest}s` : phase === "done" ? "Done" : `Stretch ${safeWork}s`;
+  const statusText = status === "running" ? "Coach is running the timer" : status === "paused" ? "Paused by coach" : "Waiting for coach...";
 
   return (
     <div style={{background:BH.white, border:`1px solid ${BH.g300}`, borderRadius:"8px", padding:"12px 14px"}}>
@@ -1773,28 +1774,32 @@ function StretchTimer({
       <div style={{fontSize:"12px", color:BH.g700, marginBottom:"8px"}}>
         {title}{count > 0 ? ` • ${idx + 1}/${count}` : ""} • {sub}
       </div>
-      <div style={{display:"flex", gap:"8px", flexWrap:"wrap"}}>
-        <button
-          onClick={() => {
-            if (!canAdmin) return;
-            if (status === "running") onAdminPause();
-            else if (status === "paused") onAdminResume();
-            else onAdminStart();
-          }}
-          disabled={!canAdmin || count === 0}
-          style={{
-            ...btn(status === "running" ? BH.shotRed : BH.shotBlue),
+      {isAdmin ? (
+        <div style={{display:"flex", gap:"8px", flexWrap:"wrap"}}>
+          <button
+            onClick={() => {
+              if (!canAdmin) return;
+              if (status === "running") onAdminPause();
+              else if (status === "paused") onAdminResume();
+              else onAdminStart();
+            }}
+            disabled={!canAdmin || count === 0}
+            style={{
+              ...btn(status === "running" ? BH.shotRed : BH.shotBlue),
+              cursor: canAdmin ? "pointer" : "not-allowed",
+              opacity: canAdmin && count > 0 ? 1 : 0.6
+            }}>
+            {startLabel}
+          </button>
+          <button onClick={() => { if (canAdmin) onAdminReset(); }} disabled={!canAdmin} style={{
+            ...btn(BH.g500),
             cursor: canAdmin ? "pointer" : "not-allowed",
-            opacity: canAdmin && count > 0 ? 1 : 0.6
-          }}>
-          {startLabel}
-        </button>
-        <button onClick={() => { if (canAdmin) onAdminReset(); }} disabled={!canAdmin} style={{
-          ...btn(BH.g500),
-          cursor: canAdmin ? "pointer" : "not-allowed",
-          opacity: canAdmin ? 1 : 0.6
-        }}>Reset</button>
-      </div>
+            opacity: canAdmin ? 1 : 0.6
+          }}>Reset</button>
+        </div>
+      ) : (
+        <div style={{fontSize:"12px", color:BH.g600}}>{statusText}</div>
+      )}
       {isAdmin ? (
         <div style={{marginTop:"10px", display:"flex", gap:"10px", flexWrap:"wrap"}}>
           <label style={{fontSize:"11px", color:BH.g700, display:"flex", alignItems:"center", gap:"6px"}}>
@@ -2102,6 +2107,16 @@ function App() {
     return () => {
       if (channel) sb.removeChannel(channel);
     };
+  }, [sb]);
+
+  // Poll stretch session as a fallback if realtime is delayed
+  React.useEffect(() => {
+    if (!sb) return;
+    const t = setInterval(async () => {
+      const { data, error } = await sb.from("stretch_session").select("*").eq("id", 1).single();
+      if (!error && data) setStretchSession(data);
+    }, 5000);
+    return () => clearInterval(t);
   }, [sb]);
 
   // Track viewport for responsive layout
