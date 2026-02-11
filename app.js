@@ -545,6 +545,37 @@ function App() {
   const [circuitStIdx, setCircuitStIdx] = React.useState(-1);
   const [stretchTick, setStretchTick] = React.useState(0);
   const [circuitManualUntil, setCircuitManualUntil] = React.useState(0);
+  const normalizeDrills = React.useCallback((drills, defaultTime) => {
+    if (!Array.isArray(drills) || drills.length === 0) return [];
+    if (typeof drills[0] === "string") {
+      return drills.map(id => ({ id, time: defaultTime || 90 }));
+    }
+    return drills.map(d => ({
+      id: d.id,
+      time: typeof d.time === "number" ? d.time : (defaultTime || 90)
+    }));
+  }, []);
+  const applyPublishedCfg = React.useCallback((c, syncSelections) => {
+    if (!c) return;
+    const defaultTime = c.drillTime || 90;
+    const normDrills = normalizeDrills(c.drills || [], defaultTime);
+    setPubDrills(normDrills);
+    setPubExercises(c.exercises || []);
+    setPubStretches(c.stretches || []);
+    if (syncSelections) {
+      setSelDrills(normDrills);
+      setSelExercises(c.exercises || []);
+      setSelStretches(c.stretches || []);
+      setWork(c.work || 45);
+      setRest(c.rest || 15);
+      setRounds(c.rounds || 3);
+      setDrillTime(defaultTime);
+      if (typeof c.dynStretchTime === "number") setDynStretchTime(c.dynStretchTime);
+      if (typeof c.dynStretchRest === "number") setDynStretchRest(c.dynStretchRest);
+      if (typeof c.statStretchTime === "number") setStatStretchTime(c.statStretchTime);
+      if (typeof c.statStretchRest === "number") setStatStretchRest(c.statStretchRest);
+    }
+  }, [normalizeDrills]);
 
   // Sync stretch durations from session
   React.useEffect(() => {
@@ -580,6 +611,8 @@ function App() {
     return () => clearInterval(t);
   }, [stretchSession && stretchSession.dyn_status, stretchSession && stretchSession.stat_status, stretchSession && stretchSession.dyn_start_time, stretchSession && stretchSession.stat_start_time]);
 
+  const admin = !!(user && ADMIN_EMAILS.includes((user.email || "").toLowerCase()));
+
   // Load config on mount
   React.useEffect(() => {
     let cfg = null;
@@ -587,36 +620,6 @@ function App() {
     if (h.startsWith("config=")) {
       try { cfg = JSON.parse(atob(h.slice(7))); } catch(e) {}
     }
-    const normalizeDrills = (drills, defaultTime) => {
-      if (!Array.isArray(drills)) return [];
-      if (drills.length === 0) return [];
-      if (typeof drills[0] === "string") {
-        return drills.map(id => ({ id, time: defaultTime || 90 }));
-      }
-      return drills.map(d => ({
-        id: d.id,
-        time: typeof d.time === "number" ? d.time : (defaultTime || 90)
-      }));
-    };
-    const applyCfg = (c) => {
-      if (!c) return;
-      const defaultTime = c.drillTime || 90;
-      const normDrills = normalizeDrills(c.drills || [], defaultTime);
-      setPubDrills(normDrills);
-      setPubExercises(c.exercises || []);
-      setPubStretches(c.stretches || []);
-      setSelDrills(normDrills);
-      setSelExercises(c.exercises || []);
-      setSelStretches(c.stretches || []);
-      setWork(c.work || 45);
-      setRest(c.rest || 15);
-      setRounds(c.rounds || 3);
-      setDrillTime(defaultTime);
-      if (typeof c.dynStretchTime === "number") setDynStretchTime(c.dynStretchTime);
-      if (typeof c.dynStretchRest === "number") setDynStretchRest(c.dynStretchRest);
-      if (typeof c.statStretchTime === "number") setStatStretchTime(c.statStretchTime);
-      if (typeof c.statStretchRest === "number") setStatStretchRest(c.statStretchRest);
-    };
     const loadFromSupabase = async () => {
       const res = await sbRest("published_plan?select=data&id=eq.1", { method: "GET" });
       if (!res.ok) return null;
@@ -625,23 +628,21 @@ function App() {
       return rows[0].data;
     };
     if (cfg) {
-      applyCfg(cfg);
+      applyPublishedCfg(cfg, true);
     } else {
       (async () => {
         const sbCfg = await loadFromSupabase();
         if (sbCfg) {
-          applyCfg(sbCfg);
+          applyPublishedCfg(sbCfg, true);
         } else {
           const lc = localStorage.getItem("bh-tennis-published");
           if (lc) {
-            try { applyCfg(JSON.parse(lc)); } catch(e) {}
+            try { applyPublishedCfg(JSON.parse(lc), true); } catch(e) {}
           }
         }
       })();
     }
-  }, []);
-
-  const admin = !!(user && ADMIN_EMAILS.includes((user.email || "").toLowerCase()));
+  }, [applyPublishedCfg]);
 
   // Auth state
   React.useEffect(() => {
@@ -658,6 +659,27 @@ function App() {
       if (sub && sub.subscription) sub.subscription.unsubscribe();
     };
   }, [sb]);
+
+  // Keep published plan synced so all devices update immediately after admin publishes
+  React.useEffect(() => {
+    let channel = null;
+    if (!sb) return;
+    const loadPublishedPlan = async () => {
+      const { data, error } = await sb.from("published_plan").select("data").eq("id", 1).single();
+      if (!error && data && data.data) applyPublishedCfg(data.data, !admin);
+    };
+    loadPublishedPlan();
+    channel = sb.channel("published_plan")
+      .on("postgres_changes", { event: "*", schema: "public", table: "published_plan", filter: "id=eq.1" }, (payload) => {
+        if (payload.new && payload.new.data) applyPublishedCfg(payload.new.data, !admin);
+      })
+      .subscribe();
+    const t = setInterval(loadPublishedPlan, 5000);
+    return () => {
+      if (channel) sb.removeChannel(channel);
+      clearInterval(t);
+    };
+  }, [sb, admin, applyPublishedCfg]);
 
   // Load circuit session + subscribe to realtime
   React.useEffect(() => {
@@ -1130,13 +1152,14 @@ function App() {
     }
   }, [circuitExercises.length]);
 
-  // Auto-select first drill when view drill is null
+  // Keep drill selection valid as published/admin lists change
   React.useEffect(() => {
-    if (!viewDrill) {
-      if (admin && selDrills.length > 0) setViewDrill(selDrills[0]);
-      else if (!admin && playerDrills.length > 0) setViewDrill(playerDrills[0].id);
-    }
-  }, [admin, selDrills, playerDrills.length]);
+    const nextId = admin
+      ? (selDrills.length > 0 ? selDrills[0].id : null)
+      : (playerDrills.length > 0 ? playerDrills[0].drill.id : null);
+    const exists = viewDrill && orderedDrillIds.includes(viewDrill);
+    if (!exists) setViewDrill(nextId);
+  }, [admin, viewDrill, orderedDrillIds.join(",")]);
 
   // --- RENDER ---
 
