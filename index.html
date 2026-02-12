@@ -96,40 +96,41 @@ const EXERCISES=[
 const EX_CATS=["All",...Array.from(new Set(EXERCISES.map(e=>e.cat)))];
 
 const STRETCHES=[
-  {id:"leg-swings",name:"Leg Swings (Front/Back)",type:"Dynamic",area:"Hips/Hamstrings",desc:"Hold a fence or wall. Swing the leg forward and back under control, stay tall.",reps:"10 each"},
-  {id:"leg-swings-side",name:"Leg Swings (Side-to-Side)",type:"Dynamic",area:"Hips/Groin",desc:"Open the hip and swing across the body, then out to the side.",reps:"10 each"},
-  {id:"walking-lunge-twist",name:"Walking Lunge + Twist",type:"Dynamic",area:"Hip Flexors/Thoracic",desc:"Step into a lunge, rotate toward the front leg, then switch.",reps:"8 each"},
-  {id:"inch-worms",name:"Inchworms",type:"Dynamic",area:"Posterior Chain/Shoulders",desc:"Hinge forward, walk hands out to plank, then walk feet in.",reps:"6 reps"},
-  {id:"worlds-greatest",name:"World's Greatest Stretch",type:"Dynamic",area:"Hips/Thoracic",desc:"Lunge, elbow to instep, then rotate the chest to the sky.",reps:"5 each"},
-  {id:"arm-circles",name:"Arm Circles",type:"Dynamic",area:"Shoulders",desc:"Small to large circles forward and backward.",reps:"20 each way"},
-  {id:"high-knee-hugs",name:"High Knee Hugs",type:"Dynamic",area:"Glutes/Hips",desc:"Pull knee to chest, rise tall, then switch legs.",reps:"8 each"},
-  {id:"quad-pull-walk",name:"Walking Quad Pull",type:"Dynamic",area:"Quads/Hip Flexors",desc:"Grab ankle, pull heel to glute, squeeze glute, step forward.",reps:"8 each"},
-  {id:"a-skips",name:"A-Skips",type:"Dynamic",area:"Calves/Hip Flexors",desc:"Drive the knee up, dorsiflex the foot, and stay tall.",reps:"2 x 15 yards"},
-  {id:"karaoke",name:"Karaoke (Grapevine)",type:"Dynamic",area:"Hips/Groin",desc:"Cross behind and in front while staying low and controlled.",reps:"2 x 15 yards"},
-  {id:"lat-lunge-reach",name:"Lateral Lunge + Reach",type:"Dynamic",area:"Adductors/Thoracic",desc:"Sit into the hip, keep the other leg long, and reach over.",reps:"6 each"},
-  {id:"open-close-gate",name:"Open/Close the Gate",type:"Dynamic",area:"Hips",desc:"Lift the knee and rotate the hip open, then close across the body.",reps:"8 each"},
-  {id:"scorpion",name:"Scorpion Kicks",type:"Dynamic",area:"Hip Flexors/Thoracic",desc:"Prone, lift one leg and reach across to the opposite side.",reps:"6 each"},
-  {id:"shuffle-arm-swing",name:"Side Shuffle + Arm Swings",type:"Dynamic",area:"Hips/Shoulders",desc:"Short lateral shuffles while swinging the arms across the body.",reps:"2 x 10 yards"},
-  {id:"rev-lunge-knee",name:"Reverse Lunge to Knee Drive",type:"Dynamic",area:"Glutes/Balance",desc:"Step back into a lunge, then drive the knee up and hold tall.",reps:"6 each"},
-  {id:"ankle-hops",name:"Ankle Hops",type:"Dynamic",area:"Ankles/Achilles",desc:"Small quick hops, stay on the balls of your feet.",reps:"20 reps"},
-  {id:"hamstring",name:"Seated Hamstring Stretch",type:"Static",area:"Hamstrings",desc:"Sit tall, hinge at the hips, and reach to the shin or toe.",reps:"30 sec"},
-  {id:"quad",name:"Standing Quad Stretch",type:"Static",area:"Quads",desc:"Knees together, pelvis tucked, hold the ankle gently.",reps:"30 sec each"},
-  {id:"calf",name:"Wall Calf Stretch",type:"Static",area:"Calves",desc:"Back heel down, knee straight, lean into the wall.",reps:"30 sec each"},
-  {id:"hip-flexor",name:"Half-Kneeling Hip Flexor",type:"Static",area:"Hip Flexors",desc:"Tuck pelvis, squeeze glute, shift forward slightly.",reps:"30 sec each"},
-  {id:"figure-4",name:"Figure-4 Glute Stretch",type:"Static",area:"Glutes",desc:"Cross ankle over knee, pull the legs in until you feel the stretch.",reps:"30 sec each"},
-  {id:"adductor",name:"Butterfly Groin Stretch",type:"Static",area:"Groin",desc:"Feet together, knees out, hinge forward with a long spine.",reps:"30 sec"},
-  {id:"childs-pose",name:"Child's Pose",type:"Static",area:"Back/Lats",desc:"Sit hips back, reach long through the arms, breathe deep.",reps:"45 sec"},
-  {id:"cross-body",name:"Cross-Body Shoulder Stretch",type:"Static",area:"Shoulders",desc:"Pull arm across the chest, keep shoulders down.",reps:"30 sec each"},
-  {id:"triceps",name:"Overhead Triceps Stretch",type:"Static",area:"Triceps/Shoulders",desc:"Elbow up, gentle pull with the other hand.",reps:"30 sec each"},
-  {id:"pigeon",name:"Pigeon Stretch",type:"Static",area:"Glutes/Piriformis",desc:"Front leg bent, back leg long, hinge forward as tolerated.",reps:"30 sec each"},
-  {id:"couch-stretch",name:"Couch Stretch",type:"Static",area:"Hip Flexors/Quads",desc:"Back shin on wall/bench, keep ribs down, squeeze glute.",reps:"30 sec each"},
-  {id:"soleus",name:"Bent-Knee Calf Stretch",type:"Static",area:"Soleus",desc:"Back heel down, knee bent, lean forward slightly.",reps:"30 sec each"},
-  {id:"hamstring-strap",name:"Supine Hamstring with Strap",type:"Static",area:"Hamstrings",desc:"Lie on back, loop strap, and gently straighten the knee.",reps:"30 sec each"},
-  {id:"sleeper",name:"Sleeper Stretch",type:"Static",area:"Posterior Shoulder",desc:"Side-lying, gently rotate the forearm down.",reps:"30 sec each"},
-  {id:"pec-doorway",name:"Doorway Pec Stretch",type:"Static",area:"Chest/Shoulders",desc:"Forearm on the doorframe, step through until gentle stretch.",reps:"30 sec each"},
-  {id:"forearm",name:"Forearm Flexor/Extensor Stretch",type:"Static",area:"Forearms",desc:"Straight arm, palm down then up, gently pull fingers.",reps:"30 sec each"},
-  {id:"spinal-twist",name:"Supine Spinal Twist",type:"Static",area:"Low Back/Hips",desc:"Knees to one side, shoulders heavy, breathe deep.",reps:"30 sec each"}
+  {id:"leg-swings",name:"Leg Swings (Front/Back)",type:"Dynamic",area:"Hips/Hamstrings",desc:"Hold a fence or wall. Swing the leg forward and back under control, stay tall.",reps:"10 each",youtubeId:"rHg6Gypeoe8",youtubeEnd:30},
+  {id:"leg-swings-side",name:"Leg Swings (Side-to-Side)",type:"Dynamic",area:"Hips/Groin",desc:"Open the hip and swing across the body, then out to the side.",reps:"10 each",youtubeId:"crhTT59Fj60"},
+  {id:"walking-lunge-twist",name:"Walking Lunge + Twist",type:"Dynamic",area:"Hip Flexors/Thoracic",desc:"Step into a lunge, rotate toward the front leg, then switch.",reps:"8 each",youtubeId:"7yrkGWJHSP0",youtubeStart:148,youtubeEnd:178},
+  {id:"inch-worms",name:"Inchworms",type:"Dynamic",area:"Posterior Chain/Shoulders",desc:"Hinge forward, walk hands out to plank, then walk feet in.",reps:"6 reps",youtubeId:"SZPEOmobz5E"},
+  {id:"worlds-greatest",name:"World's Greatest Stretch",type:"Dynamic",area:"Hips/Thoracic",desc:"Lunge, elbow to instep, then rotate the chest to the sky.",reps:"5 each",youtubeId:"-reO4W7j7Sg"},
+  {id:"arm-circles",name:"Arm Circles",type:"Dynamic",area:"Shoulders",desc:"Small to large circles forward and backward.",reps:"20 each way",youtubeId:"14ConGRqj-k",youtubeStart:45,youtubeEnd:75},
+  {id:"high-knee-hugs",name:"High Knee Hugs",type:"Dynamic",area:"Glutes/Hips",desc:"Pull knee to chest, rise tall, then switch legs.",reps:"8 each",youtubeId:"o5y2TF3IKVk",youtubeStart:139,youtubeEnd:169},
+  {id:"quad-pull-walk",name:"Walking Quad Pull",type:"Dynamic",area:"Quads/Hip Flexors",desc:"Grab ankle, pull heel to glute, squeeze glute, step forward.",reps:"8 each",youtubeId:"Zy8ldV_Cbqg",youtubeStart:198,youtubeEnd:228},
+  {id:"a-skips",name:"A-Skips",type:"Dynamic",area:"Calves/Hip Flexors",desc:"Drive the knee up, dorsiflex the foot, and stay tall.",reps:"2 x 15 yards",youtubeId:"Hn6y8jNquVc"},
+  {id:"karaoke",name:"Karaoke (Grapevine)",type:"Dynamic",area:"Hips/Groin",desc:"Cross behind and in front while staying low and controlled.",reps:"2 x 15 yards",youtubeId:"uWavy_f2sVY"},
+  {id:"lat-lunge-reach",name:"Lateral Lunge + Reach",type:"Dynamic",area:"Adductors/Thoracic",desc:"Sit into the hip, keep the other leg long, and reach over.",reps:"6 each",youtubeId:"ujon6D0nLk8",youtubeStart:292,youtubeEnd:322},
+  {id:"open-close-gate",name:"Open/Close the Gate",type:"Dynamic",area:"Hips",desc:"Lift the knee and rotate the hip open, then close across the body.",reps:"8 each",youtubeId:"ufRZ0Y6F2F4",youtubeStart:210,youtubeEnd:240},
+  {id:"scorpion",name:"Scorpion Kicks",type:"Dynamic",area:"Hip Flexors/Thoracic",desc:"Prone, lift one leg and reach across to the opposite side.",reps:"6 each",youtubeId:"EjJI5cV3D3o"},
+  {id:"shuffle-arm-swing",name:"Side Shuffle + Arm Swings",type:"Dynamic",area:"Hips/Shoulders",desc:"Short lateral shuffles while swinging the arms across the body.",reps:"2 x 10 yards",youtubeId:"7YX7Z8L8caE"},
+  {id:"rev-lunge-knee",name:"Reverse Lunge to Knee Drive",type:"Dynamic",area:"Glutes/Balance",desc:"Step back into a lunge, then drive the knee up and hold tall.",reps:"6 each",youtubeId:"QAseZL_2E20",youtubeStart:240,youtubeEnd:270},
+  {id:"ankle-hops",name:"Ankle Hops",type:"Dynamic",area:"Ankles/Achilles",desc:"Small quick hops, stay on the balls of your feet.",reps:"20 reps",youtubeId:"2IZj4_UIHD0"},
+  {id:"hamstring",name:"Seated Hamstring Stretch",type:"Static",area:"Hamstrings",desc:"Sit tall, hinge at the hips, and reach to the shin or toe.",reps:"30 sec",youtubeId:"UnWd3C7eWjU"},
+  {id:"quad",name:"Standing Quad Stretch",type:"Static",area:"Quads",desc:"Knees together, pelvis tucked, hold the ankle gently.",reps:"30 sec each",youtubeId:"UqQhY6q9C_U"},
+  {id:"calf",name:"Wall Calf Stretch",type:"Static",area:"Calves",desc:"Back heel down, knee straight, lean into the wall.",reps:"30 sec each",youtubeId:"BXW18-5T8aQ"},
+  {id:"hip-flexor",name:"Half-Kneeling Hip Flexor",type:"Static",area:"Hip Flexors",desc:"Tuck pelvis, squeeze glute, shift forward slightly.",reps:"30 sec each",youtubeId:"M0qQj8g6OZs"},
+  {id:"figure-4",name:"Figure-4 Glute Stretch",type:"Static",area:"Glutes",desc:"Cross ankle over knee, pull the legs in until you feel the stretch.",reps:"30 sec each",youtubeId:"XW1i6E17d9U"},
+  {id:"adductor",name:"Butterfly Groin Stretch",type:"Static",area:"Groin",desc:"Feet together, knees out, hinge forward with a long spine.",reps:"30 sec",youtubeId:"MdEeW1XJ-gA"},
+  {id:"childs-pose",name:"Child's Pose",type:"Static",area:"Back/Lats",desc:"Sit hips back, reach long through the arms, breathe deep.",reps:"45 sec",youtubeId:"2MJGg-ykAhE"},
+  {id:"cross-body",name:"Cross-Body Shoulder Stretch",type:"Static",area:"Shoulders",desc:"Pull arm across the chest, keep shoulders down.",reps:"30 sec each",youtubeId:"U0BhE67H4rM"},
+  {id:"triceps",name:"Overhead Triceps Stretch",type:"Static",area:"Triceps/Shoulders",desc:"Elbow up, gentle pull with the other hand.",reps:"30 sec each",youtubeId:"LqUe1x4v5gQ"},
+  {id:"pigeon",name:"Pigeon Stretch",type:"Static",area:"Glutes/Piriformis",desc:"Front leg bent, back leg long, hinge forward as tolerated.",reps:"30 sec each",youtubeId:"0_z4f0YQkMc"},
+  {id:"couch-stretch",name:"Couch Stretch",type:"Static",area:"Hip Flexors/Quads",desc:"Back shin on wall/bench, keep ribs down, squeeze glute.",reps:"30 sec each",youtubeId:"3gH7146Vcy4"},
+  {id:"soleus",name:"Bent-Knee Calf Stretch",type:"Static",area:"Soleus",desc:"Back heel down, knee bent, lean forward slightly.",reps:"30 sec each",youtubeId:"O12H3t1nNwE"},
+  {id:"hamstring-strap",name:"Supine Hamstring with Strap",type:"Static",area:"Hamstrings",desc:"Lie on back, loop strap, and gently straighten the knee.",reps:"30 sec each",youtubeId:"22_tC9_9mC8"},
+  {id:"sleeper",name:"Sleeper Stretch",type:"Static",area:"Posterior Shoulder",desc:"Side-lying, gently rotate the forearm down.",reps:"30 sec each",youtubeId:"IBWToThYZgo"},
+  {id:"pec-doorway",name:"Doorway Pec Stretch",type:"Static",area:"Chest/Shoulders",desc:"Forearm on the doorframe, step through until gentle stretch.",reps:"30 sec each",youtubeId:"XU5L453a2qA"},
+  {id:"forearm",name:"Forearm Flexor/Extensor Stretch",type:"Static",area:"Forearms",desc:"Straight arm, palm down then up, gently pull fingers.",reps:"30 sec each",youtubeId:"7Mx9y1s72aE"},
+  {id:"spinal-twist",name:"Supine Spinal Twist",type:"Static",area:"Low Back/Hips",desc:"Knees to one side, shoulders heavy, breathe deep.",reps:"30 sec each",youtubeId:"TeAhhVD2q1c"}
 ];
+const STRETCH_TYPES=["All",...Array.from(new Set(STRETCHES.map(s=>s.type)))];
 
 const DRILLS=[
   {
@@ -2405,6 +2406,12 @@ function App() {
   const activeStretchWork = isDynamicStretchTab ? dynStretchTime : statStretchTime;
   const activeStretchRest = isDynamicStretchTab ? dynStretchRest : statStretchRest;
   const activeStretchProgress = isDynamicStretchTab ? dynProgress : statProgress;
+  const activeStretchVideoIdx = (
+    activeStretchProgress.phase === "stretch" &&
+    activeStretchProgress.idx >= 0 &&
+    activeStretchProgress.idx < activeStretchList.length
+  ) ? activeStretchProgress.idx : 0;
+  const activeStretchVideo = activeStretchList[activeStretchVideoIdx] || null;
 
   // Equipment summary for circuit exercises
   const summarizeEquipment = (items) => {
@@ -3292,6 +3299,31 @@ function App() {
                           }}
                         />
                       </div>
+                      {activeStretchVideo && activeStretchVideo.youtubeId && (
+                        <div style={{flex:1, minWidth:admin ? "220px" : "320px", background:BH.white, border:`1px solid ${BH.g300}`, borderRadius:"8px", overflow:"hidden"}}>
+                          <div style={{padding:"8px 12px", background:activeStretchColor, display:"flex", alignItems:"center", justifyContent:"space-between", gap:"8px"}}>
+                            <span style={{fontSize:"12px", fontWeight:"bold", color:BH.white}}>
+                              Current Stretch Video: {activeStretchVideoIdx + 1}. {activeStretchVideo.name}
+                            </span>
+                            <a
+                              href={`https://www.youtube.com/watch?v=${activeStretchVideo.youtubeId}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{fontSize:"11px", fontWeight:"bold", color:BH.white, textDecoration:"underline"}}>
+                              Open
+                            </a>
+                          </div>
+                          <div style={{position:"relative", paddingBottom:"56.25%", height:0}}>
+                            <iframe
+                              src={`https://www.youtube.com/embed/${activeStretchVideo.youtubeId}?${activeStretchVideo.youtubeStart ? "start="+activeStretchVideo.youtubeStart : ""}${activeStretchVideo.youtubeEnd ? "&end="+activeStretchVideo.youtubeEnd : ""}&rel=0&modestbranding=1`}
+                              frameBorder="0"
+                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope"
+                              allowFullScreen
+                              style={{position:"absolute", inset:0, width:"100%", height:"100%"}}
+                            />
+                          </div>
+                        </div>
+                      )}
                   </div>
                   <div style={{display:"grid", gridTemplateColumns:"1fr", gap:"14px"}}>
                     <div>

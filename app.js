@@ -1022,6 +1022,12 @@ function App() {
   const activeStretchWork = isDynamicStretchTab ? dynStretchTime : statStretchTime;
   const activeStretchRest = isDynamicStretchTab ? dynStretchRest : statStretchRest;
   const activeStretchProgress = isDynamicStretchTab ? dynProgress : statProgress;
+  const activeStretchVideoIdx = (
+    activeStretchProgress.phase === "stretch" &&
+    activeStretchProgress.idx >= 0 &&
+    activeStretchProgress.idx < activeStretchList.length
+  ) ? activeStretchProgress.idx : 0;
+  const activeStretchVideo = activeStretchList[activeStretchVideoIdx] || null;
 
   // Equipment summary for circuit exercises
   const summarizeEquipment = (items) => {
@@ -1910,6 +1916,31 @@ function App() {
                           }}
                         />
                       </div>
+                      {activeStretchVideo && activeStretchVideo.youtubeId && (
+                        <div style={{flex:1, minWidth:admin ? "220px" : "320px", background:BH.white, border:`1px solid ${BH.g300}`, borderRadius:"8px", overflow:"hidden"}}>
+                          <div style={{padding:"8px 12px", background:activeStretchColor, display:"flex", alignItems:"center", justifyContent:"space-between", gap:"8px"}}>
+                            <span style={{fontSize:"12px", fontWeight:"bold", color:BH.white}}>
+                              Current Stretch Video: {activeStretchVideoIdx + 1}. {activeStretchVideo.name}
+                            </span>
+                            <a
+                              href={`https://www.youtube.com/watch?v=${activeStretchVideo.youtubeId}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{fontSize:"11px", fontWeight:"bold", color:BH.white, textDecoration:"underline"}}>
+                              Open
+                            </a>
+                          </div>
+                          <div style={{position:"relative", paddingBottom:"56.25%", height:0}}>
+                            <iframe
+                              src={`https://www.youtube.com/embed/${activeStretchVideo.youtubeId}?${activeStretchVideo.youtubeStart ? "start="+activeStretchVideo.youtubeStart : ""}${activeStretchVideo.youtubeEnd ? "&end="+activeStretchVideo.youtubeEnd : ""}&rel=0&modestbranding=1`}
+                              frameBorder="0"
+                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope"
+                              allowFullScreen
+                              style={{position:"absolute", inset:0, width:"100%", height:"100%"}}
+                            />
+                          </div>
+                        </div>
+                      )}
                   </div>
                   <div style={{display:"grid", gridTemplateColumns:"1fr", gap:"14px"}}>
                     <div>
