@@ -25,9 +25,11 @@ function CircuitRing({stations, selectedIdx, onSelect, onRemove}) {
   const width = size;
   const height = size + padY * 2;
   const cx = width / 2, cy = height / 2;
-  const rad = size * 0.385;
-  const nr = size * 0.092;
-  const fs = size < 420 ? 10 : 11;
+  const rad = size * 0.39;
+  const arcGap = (2 * Math.PI * rad) / Math.max(1, n);
+  const nr = Math.max(14, Math.min(size * 0.092, (arcGap - 10) / 2));
+  const fs = n > 14 ? 8 : (size < 420 ? 10 : 11);
+  const badgeR = Math.max(8, Math.min(11, nr * 0.32));
 
   // Helper to wrap text into multiple lines
   function wrapText(text, maxLen) {
@@ -76,9 +78,11 @@ function CircuitRing({stations, selectedIdx, onSelect, onRemove}) {
              onClick={() => onSelect && onSelect(i)}>
             <circle cx={x} cy={y} r={nr} fill={fillCol} stroke={strokeCol} strokeWidth={strokeW}/>
 
-            {/* Station number above */}
-            <text x={x} y={y - nr - 12} textAnchor="middle" fontSize="12" fontWeight="bold"
-                  fill={BH.navy} style={{pointerEvents:"none", paintOrder:"stroke", stroke:BH.white, strokeWidth:3}}>
+            {/* Station number badge (inside node to avoid overlap at high station counts) */}
+            <circle cx={x} cy={y - nr * 0.62} r={badgeR} fill={BH.white} stroke={strokeCol} strokeWidth={1.5}/>
+            <text x={x} y={y - nr * 0.62 + 1} textAnchor="middle" dominantBaseline="middle"
+                  fontSize={Math.max(10, badgeR + 2)} fontWeight="bold" fill={BH.navy}
+                  style={{pointerEvents:"none"}}>
               {stationNum}
             </text>
 
@@ -90,23 +94,23 @@ function CircuitRing({stations, selectedIdx, onSelect, onRemove}) {
             )}
             {lines.length === 2 && (
               <>
-                <text x={x} y={y - 4} textAnchor="middle" dominantBaseline="middle"
+                <text x={x} y={y - 2} textAnchor="middle" dominantBaseline="middle"
                       fontSize={fs} fontWeight="bold" fill={BH.white}
                       style={{pointerEvents:"none"}}>{lines[0]}</text>
-                <text x={x} y={y + 8} textAnchor="middle" dominantBaseline="middle"
+                <text x={x} y={y + 10} textAnchor="middle" dominantBaseline="middle"
                       fontSize={fs} fontWeight="bold" fill={BH.white}
                       style={{pointerEvents:"none"}}>{lines[1]}</text>
               </>
             )}
             {lines.length >= 3 && (
               <>
-                <text x={x} y={y - 8} textAnchor="middle" dominantBaseline="middle"
+                <text x={x} y={y - 6} textAnchor="middle" dominantBaseline="middle"
                       fontSize={fs} fontWeight="bold" fill={BH.white}
                       style={{pointerEvents:"none"}}>{lines[0]}</text>
-                <text x={x} y={y + 2} textAnchor="middle" dominantBaseline="middle"
+                <text x={x} y={y + 4} textAnchor="middle" dominantBaseline="middle"
                       fontSize={fs} fontWeight="bold" fill={BH.white}
                       style={{pointerEvents:"none"}}>{lines[1]}</text>
-                <text x={x} y={y + 12} textAnchor="middle" dominantBaseline="middle"
+                <text x={x} y={y + 14} textAnchor="middle" dominantBaseline="middle"
                       fontSize={fs} fontWeight="bold" fill={BH.white}
                       style={{pointerEvents:"none"}}>{lines[2]}</text>
               </>
